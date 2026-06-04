@@ -2773,7 +2773,7 @@ it("shows update-available state in the version entry and opens the update popov
     ok: true,
     json: async () => ({
       tag_name: "v0.2.0",
-      html_url: "https://github.com/Ming/ai-session/releases/tag/v0.2.0",
+      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
       published_at: "2026-05-29T12:00:00Z",
       body: "更新说明",
     }),
@@ -2792,12 +2792,56 @@ it("shows update-available state in the version entry and opens the update popov
   expect(screen.getByText("v0.2.0")).toBeInTheDocument();
 });
 
+it("checks updates against the public GitHub repository", async () => {
+  global.fetch = vi.fn(async () => ({
+    ok: true,
+    json: async () => ({
+      tag_name: "v0.1.1",
+      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.1.1",
+      published_at: "2026-06-04T12:00:00Z",
+      body: "更新说明",
+    }),
+  })) as typeof fetch;
+
+  await act(async () => {
+    render(<AppShell />);
+  });
+
+  await waitFor(() => {
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.github.com/repos/caiweiming/ai-session-manager/releases/latest",
+    );
+  });
+});
+
+it("shows a no public release hint when GitHub latest release returns 404", async () => {
+  global.fetch = vi.fn(async () => ({
+    ok: false,
+    status: 404,
+    json: async () => ({}),
+  })) as typeof fetch;
+
+  await act(async () => {
+    render(<AppShell />);
+  });
+
+  await waitFor(() => {
+    expect(screen.getByLabelText("app-update-entry")).toHaveTextContent(`v${defaultAppVersion}`);
+  });
+
+  await clickElement(screen.getByLabelText("app-update-entry"));
+
+  await waitFor(() => {
+    expect(screen.getByText("暂无公开发布版本")).toBeInTheDocument();
+  });
+});
+
 it("renders the update popover outside the sidebar clipping container", async () => {
   global.fetch = vi.fn(async () => ({
     ok: true,
     json: async () => ({
       tag_name: "v0.2.0",
-      html_url: "https://github.com/Ming/ai-session/releases/tag/v0.2.0",
+      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
       published_at: "2026-05-29T12:00:00Z",
       body: "更新说明",
     }),
@@ -2823,7 +2867,7 @@ it("closes the update popover when clicking outside", async () => {
     ok: true,
     json: async () => ({
       tag_name: "v0.2.0",
-      html_url: "https://github.com/Ming/ai-session/releases/tag/v0.2.0",
+      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
       published_at: "2026-05-29T12:00:00Z",
       body: "更新说明",
     }),
@@ -2852,7 +2896,7 @@ it("closes the update popover when pressing Escape", async () => {
     ok: true,
     json: async () => ({
       tag_name: "v0.2.0",
-      html_url: "https://github.com/Ming/ai-session/releases/tag/v0.2.0",
+      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
       published_at: "2026-05-29T12:00:00Z",
       body: "更新说明",
     }),
@@ -2886,7 +2930,7 @@ it("repositions the update popover when the window resizes", async () => {
     ok: true,
     json: async () => ({
       tag_name: "v0.2.0",
-      html_url: "https://github.com/Ming/ai-session/releases/tag/v0.2.0",
+      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
       published_at: "2026-05-29T12:00:00Z",
       body: "更新说明",
     }),
@@ -2945,7 +2989,7 @@ it("repositions the update popover when the window scrolls", async () => {
     ok: true,
     json: async () => ({
       tag_name: "v0.2.0",
-      html_url: "https://github.com/Ming/ai-session/releases/tag/v0.2.0",
+      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
       published_at: "2026-05-29T12:00:00Z",
       body: "更新说明",
     }),
@@ -3005,7 +3049,7 @@ it("allows manually checking updates and opens the release page when an update i
       ok: true,
       json: async () => ({
         tag_name: "v0.2.0",
-        html_url: "https://github.com/Ming/ai-session/releases/tag/v0.2.0",
+        html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
         published_at: "2026-05-29T12:00:00Z",
         body: "更新说明",
       }),
@@ -3028,7 +3072,7 @@ it("allows manually checking updates and opens the release page when an update i
     expect(requestCount).toBeGreaterThanOrEqual(2);
   });
   expect(openExternalSpy).toHaveBeenCalledWith({
-    url: "https://github.com/Ming/ai-session/releases/tag/v0.2.0",
+    url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
   });
 });
 

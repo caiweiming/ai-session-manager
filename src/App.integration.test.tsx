@@ -177,12 +177,12 @@ it("calls settings and runtime commands with stable payload contracts", async ()
 it("calls version and external url commands with stable contracts", async () => {
   const version = await api.getAppVersion();
   await api.openExternalUrl({
-    url: "https://github.com/Ming/ai-session/releases/latest",
+    url: "https://github.com/caiweiming/ai-session-manager/releases/latest",
   });
 
   expect(invokeMock).toHaveBeenCalledWith("get_app_version");
   expect(invokeMock).toHaveBeenCalledWith("open_external_url", {
-    payload: { url: "https://github.com/Ming/ai-session/releases/latest" },
+    payload: { url: "https://github.com/caiweiming/ai-session-manager/releases/latest" },
   });
   expect(version).toBe(defaultAppVersion);
 });

@@ -5,6 +5,7 @@ import {
   parseGithubLatestRelease,
   type GithubLatestRelease,
 } from "../../../lib/updateChecker";
+import { createReleaseTagUrl } from "../../../lib/releaseConfig";
 
 export type UpdateCheckStatus =
   | "idle"
@@ -54,7 +55,7 @@ const createScenarioRelease = (scenario: Exclude<UpdateScenario, "error">, curre
   return {
     version,
     tagName: `v${version}`,
-    url: `https://github.com/Ming/ai-session/releases/tag/v${version}`,
+    url: createReleaseTagUrl(`v${version}`),
     publishedAt: "2026-06-01T00:00:00Z",
     notes: "开发环境更新测试场景",
   };
@@ -101,6 +102,9 @@ export function useUpdateChecker({
       } else {
         const response = await fetchImpl(releasesLatestUrl);
         if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error("暂无公开发布版本");
+          }
           throw new Error(`update request failed: ${response.status}`);
         }
 

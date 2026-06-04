@@ -7,7 +7,7 @@ it("checks GitHub latest release on startup and reports update_available when a 
     ok: true,
     json: async () => ({
       tag_name: "v0.2.0",
-      html_url: "https://github.com/Ming/ai-session/releases/tag/v0.2.0",
+      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
       published_at: "2026-05-29T12:00:00Z",
       body: "更新说明",
     }),
@@ -16,7 +16,7 @@ it("checks GitHub latest release on startup and reports update_available when a 
   const { result } = renderHook(() =>
     useUpdateChecker({
       currentVersion: "0.1.0",
-      releasesLatestUrl: "https://api.github.com/repos/Ming/ai-session/releases/latest",
+      releasesLatestUrl: "https://api.github.com/repos/caiweiming/ai-session-manager/releases/latest",
       fetchImpl: fetchMock as typeof fetch,
     }),
   );
@@ -34,7 +34,7 @@ it("prefers URL scenario over env scenario in development mode", async () => {
   const { result } = renderHook(() =>
     useUpdateChecker({
       currentVersion: "0.1.0",
-      releasesLatestUrl: "https://api.github.com/repos/Ming/ai-session/releases/latest",
+      releasesLatestUrl: "https://api.github.com/repos/caiweiming/ai-session-manager/releases/latest",
       fetchImpl: fetchMock as typeof fetch,
       devMode: true,
       locationSearch: "?updateScenario=error",
@@ -53,7 +53,7 @@ it("returns up_to_date when the development scenario is uptodate", async () => {
   const { result } = renderHook(() =>
     useUpdateChecker({
       currentVersion: "0.1.0",
-      releasesLatestUrl: "https://api.github.com/repos/Ming/ai-session/releases/latest",
+      releasesLatestUrl: "https://api.github.com/repos/caiweiming/ai-session-manager/releases/latest",
       devMode: true,
       locationSearch: "?updateScenario=uptodate",
     }),
@@ -71,7 +71,7 @@ it("ignores development scenarios outside development mode", async () => {
     ok: true,
     json: async () => ({
       tag_name: "v0.2.0",
-      html_url: "https://github.com/Ming/ai-session/releases/tag/v0.2.0",
+      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
       published_at: "2026-05-29T12:00:00Z",
       body: "更新说明",
     }),
@@ -80,7 +80,7 @@ it("ignores development scenarios outside development mode", async () => {
   const { result } = renderHook(() =>
     useUpdateChecker({
       currentVersion: "0.1.0",
-      releasesLatestUrl: "https://api.github.com/repos/Ming/ai-session/releases/latest",
+      releasesLatestUrl: "https://api.github.com/repos/caiweiming/ai-session-manager/releases/latest",
       fetchImpl: fetchMock as typeof fetch,
       devMode: false,
       locationSearch: "?updateScenario=error",
@@ -93,4 +93,27 @@ it("ignores development scenarios outside development mode", async () => {
   });
 
   expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+it("shows a clear message when the public repository has no stable releases yet", async () => {
+  const fetchMock = vi.fn(async () => ({
+    ok: false,
+    status: 404,
+    json: async () => ({}),
+  }));
+
+  const { result } = renderHook(() =>
+    useUpdateChecker({
+      currentVersion: "0.1.0",
+      releasesLatestUrl: "https://api.github.com/repos/caiweiming/ai-session-manager/releases/latest",
+      fetchImpl: fetchMock as typeof fetch,
+      devMode: false,
+    }),
+  );
+
+  await waitFor(() => {
+    expect(result.current.status).toBe("error");
+  });
+
+  expect(result.current.errorMessage).toBe("暂无公开发布版本");
 });

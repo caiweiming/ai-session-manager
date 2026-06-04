@@ -56,6 +56,13 @@ const formatBeijingDateTime = (value: number | null | undefined) => {
   }
 };
 
+const formatUpdateErrorHint = (message: string | null) => {
+  if (message === "暂无公开发布版本") {
+    return message;
+  }
+  return "暂时无法检查更新";
+};
+
 export function Sidebar({
   layout,
   navigation,
@@ -254,7 +261,7 @@ export function Sidebar({
       : update.status === "up_to_date"
         ? "当前已是最新版本"
         : update.status === "error"
-          ? "暂时无法检查更新"
+          ? formatUpdateErrorHint(update.errorMessage)
           : null;
 
   return (

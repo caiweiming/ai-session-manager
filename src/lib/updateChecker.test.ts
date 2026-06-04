@@ -26,7 +26,7 @@ describe("updateChecker", () => {
   it("parses GitHub latest release payload", () => {
     const parsed = parseGithubLatestRelease({
       tag_name: "v0.2.0",
-      html_url: "https://github.com/Ming/ai-session/releases/tag/v0.2.0",
+      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
       published_at: "2026-05-29T12:00:00Z",
       body: "更新说明",
     });
@@ -34,7 +34,7 @@ describe("updateChecker", () => {
     expect(parsed).toEqual({
       version: "0.2.0",
       tagName: "v0.2.0",
-      url: "https://github.com/Ming/ai-session/releases/tag/v0.2.0",
+      url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
       publishedAt: "2026-05-29T12:00:00Z",
       notes: "更新说明",
     });
