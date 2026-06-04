@@ -130,27 +130,6 @@ ai-session-manager-v0.1.1-macos-universal.dmg
 pnpm run release:assets
 ```
 
-## GitHub Actions 发布
-
-仓库内置了 `.github/workflows/release.yml`。
-
-手动发布：
-
-1. 打开 GitHub 仓库的 Actions 页面。
-2. 选择 `release` workflow。
-3. 点击 `Run workflow`。
-
-Tag 自动发布：
-
-```bash
-git tag v0.1.1
-git push origin v0.1.1
-```
-
-推送 `v*` tag 后，GitHub Actions 会在 Windows 和 macOS runner 上构建产物，并上传到 GitHub Release。
-
-注意：当前默认产物未做代码签名。Windows 可能出现 SmartScreen 提示，macOS 可能出现 Gatekeeper 提示。
-
 ## 项目结构
 
 ```text
@@ -174,27 +153,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 pnpm run release:windows
 ```
 
-## 发布前检查
-
-发布新版本前，请保持以下版本号一致：
-
-- `package.json`
-- `src-tauri/Cargo.toml`
-- `src-tauri/tauri.conf.json`
-
-建议至少执行：
-
-```bash
-pnpm test
-cargo test --manifest-path src-tauri/Cargo.toml
-```
-
-Windows 本地发布前执行：
-
-```bash
-pnpm run release:windows
-```
-
 ## 许可证
 
-当前仓库尚未声明开源许可证。正式公开发布前，建议根据你的开源目标补充 `LICENSE` 文件。
+本项目基于 MIT License 开源，详见 [LICENSE](./LICENSE)。
+
