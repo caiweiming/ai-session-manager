@@ -126,10 +126,25 @@ fn terminal_candidate_available(candidate: &TerminalCandidate) -> bool {
 }
 
 fn command_available(command: &str) -> bool {
-    Command::new("where.exe")
-        .arg(command)
+    let mut probe = Command::new("where.exe");
+    probe.arg(command);
+    configure_background_probe_command(&mut probe);
+    probe
         .output()
         .is_ok_and(|output| output.status.success())
+}
+
+#[cfg(target_os = "windows")]
+fn background_probe_creation_flags() -> u32 {
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    CREATE_NO_WINDOW
+}
+
+#[cfg(target_os = "windows")]
+fn configure_background_probe_command(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+
+    command.creation_flags(background_probe_creation_flags());
 }
 
 fn common_windows_terminal_paths(candidate_id: &str) -> Vec<PathBuf> {
@@ -208,7 +223,10 @@ fn resolve_cli_path(env_var: &str, npm_binary: &str, where_binary: &str, fallbac
         }
     }
 
-    if let Ok(output) = Command::new("where.exe").arg(where_binary).output() {
+    let mut probe = Command::new("where.exe");
+    probe.arg(where_binary);
+    configure_background_probe_command(&mut probe);
+    if let Ok(output) = probe.output() {
         if output.status.success() {
             if let Ok(stdout) = String::from_utf8(output.stdout) {
                 if let Some(first) = stdout.lines().map(str::trim).find(|line| !line.is_empty()) {
@@ -636,6 +654,11 @@ mod tests {
             ids,
             vec!["auto", "windows_terminal", "pwsh", "cmd", "git_bash"]
         );
+    }
+
+    #[test]
+    fn background_probe_commands_should_hide_console_windows() {
+        assert_eq!(background_probe_creation_flags(), 0x0800_0000);
     }
 
     #[test]
