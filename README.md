@@ -1,38 +1,200 @@
-# AI 会话管理工具
+# AI 会话管理
 
-基于 Tauri + React + TypeScript 的本地离线 AI 会话管理工具。
+一个本地离线的 AI 会话管理桌面应用，用来集中浏览、检索、整理和导出 Codex、Claude、Gemini 等命令行 AI 工具留下的历史会话。
 
-## 当前实现范围（2026-04-24）
+应用基于 Tauri、React、TypeScript 和 Rust 构建。会话数据只在本机扫描和索引，不依赖云端服务。
 
-- 仅支持 Codex 默认目录 `~/.codex`。
-- 启动应用后自动扫描会话数据，并支持手动触发重扫。
-- 主区域表格展示真实会话列表，右侧 Inspector 展示真实消息预览详情。
-- 尚未支持手动目录选择、Claude/Gemini 数据源、运行期文件变化监听。
+## 功能特性
+
+- 多来源会话扫描：支持 Codex、Claude、Gemini 的本地会话目录。
+- 本地索引与列表浏览：按工具、时间、工作区、会话状态查看历史记录。
+- 会话详情预览：查看消息内容、来源路径、工作区、时间、Token 统计等信息。
+- 会话恢复：可从列表或详情中调用对应 CLI 恢复会话。
+- 终端偏好检测：根据 Windows、macOS、Linux 平台检测常见终端，并支持自动选择。
+- 导出 Markdown：将会话导出为 Markdown 文件，便于归档或分享。
+- 回收站与删除：支持软删除、恢复、批量删除和清空回收站。
+- 本地设置：支持主题、扫描来源、删除策略、恢复终端等配置。
+- 更新检查：可检查 GitHub Release 中的新版信息。
+- GitHub Actions 发布：支持 Windows 和 macOS 自动构建发布产物。
+
+## 数据来源
+
+应用会扫描用户主目录下常见的 AI 工具数据目录：
+
+| 工具 | 默认目录 |
+| --- | --- |
+| Codex | `~/.codex` |
+| Claude | `~/.claude` |
+| Gemini | `~/.gemini` |
+
+实际可用数据取决于对应工具是否已在本机产生历史会话文件。
+
+## 隐私说明
+
+- 应用不会主动上传会话内容。
+- 会话索引和设置保存在本机应用数据目录。
+- 导出 Markdown 时，导出内容由用户自行选择保存位置。
+- 使用“恢复会话”功能时，会调用本机已安装的对应 CLI 工具。
 
 ## 系统要求
 
-- macOS：`10.13` 及以上。
-- Windows：推荐 `Windows 10 1803` 及以上。
-- Windows 依赖 `WebView2 Runtime`；在较新的 Windows 10 / Windows 11 上通常已预装。
-- 当前 macOS 安装包为 `x64` 版本，主要面向 Intel Mac；Apple Silicon 设备通常需要通过 Rosetta 运行。
+运行应用：
+
+- Windows 10 / Windows 11，需 WebView2 Runtime。
+- macOS，需系统支持 Tauri 2 运行时要求。
+- Linux，需 WebKitGTK 等桌面运行时依赖。
+
+本地开发：
+
+- Node.js 22 或较新版本。
+- pnpm 10。
+- Rust stable。
+- Tauri 所需的系统依赖。
+
+Linux 开发环境通常需要安装：
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+```
+
+## 本地开发
+
+安装依赖：
+
+```bash
+pnpm install
+```
+
+启动开发环境：
+
+```bash
+pnpm tauri dev
+```
+
+运行前端测试：
+
+```bash
+pnpm test
+```
+
+运行 Rust 测试：
+
+```bash
+cargo test --manifest-path src-tauri/Cargo.toml
+```
+
+运行端到端测试：
+
+```bash
+pnpm e2e
+```
+
+## 构建发布版
+
+Windows 构建：
+
+```bash
+pnpm run release:windows
+```
+
+构建完成后，英文命名的发布产物会生成在：
+
+```text
+release-assets/
+```
+
+示例文件名：
+
+```text
+ai-session-manager-v0.1.1-windows-x64-portable.exe
+ai-session-manager-v0.1.1-windows-x64-setup.exe
+ai-session-manager-v0.1.1-windows-x64.msi
+```
+
+macOS 构建需要在 macOS 机器上执行：
+
+```bash
+pnpm run release:macos
+```
+
+示例文件名：
+
+```text
+ai-session-manager-v0.1.1-macos-universal.dmg
+```
+
+如果已经完成 Tauri 构建，只想重新整理英文发布文件名：
+
+```bash
+pnpm run release:assets
+```
+
+## GitHub Actions 发布
+
+仓库内置了 `.github/workflows/release.yml`。
+
+手动发布：
+
+1. 打开 GitHub 仓库的 Actions 页面。
+2. 选择 `release` workflow。
+3. 点击 `Run workflow`。
+
+Tag 自动发布：
+
+```bash
+git tag v0.1.1
+git push origin v0.1.1
+```
+
+推送 `v*` tag 后，GitHub Actions 会在 Windows 和 macOS runner 上构建产物，并上传到 GitHub Release。
+
+注意：当前默认产物未做代码签名。Windows 可能出现 SmartScreen 提示，macOS 可能出现 Gatekeeper 提示。
+
+## 项目结构
+
+```text
+.
+├── .github/workflows/     # CI 和发布流程
+├── e2e/                   # Playwright 端到端测试
+├── public/                # 前端静态资源
+├── scripts/               # 发布产物整理与校验脚本
+├── src/                   # React 前端
+├── src-tauri/             # Tauri / Rust 后端
+└── vendor/                # 固定依赖源码补丁
+```
 
 ## 常用命令
 
-- 安装依赖：`pnpm install`
-- 本地开发：`pnpm tauri dev`
-- 运行测试：`pnpm test`
-- 端到端测试：`pnpm e2e`
-- 构建桌面应用：`pnpm tauri build`
-- 打包校验：`pwsh ./scripts/verify-package.ps1`
+```bash
+pnpm install
+pnpm tauri dev
+pnpm test
+cargo test --manifest-path src-tauri/Cargo.toml
+pnpm run release:windows
+```
 
-## 发布前检查清单
+## 发布前检查
 
-- 同步修改以下 3 处版本号，并保持完全一致：
+发布新版本前，请保持以下版本号一致：
+
 - `package.json`
 - `src-tauri/Cargo.toml`
 - `src-tauri/tauri.conf.json`
-- 确认应用内显示的版本号与打包版本一致。
-- 至少运行一次构建校验：`pnpm build`
-- 正式发布桌面安装包前，再执行：`pnpm tauri build`
-- GitHub Release 的 tag 使用 `vX.Y.Z` 格式，例如 `v0.1.1`。
-- 当前更新提醒依赖 GitHub Releases 的 latest，正式发布时应创建正式版 Release，避免 pre-release 影响默认更新通道。
+
+建议至少执行：
+
+```bash
+pnpm test
+cargo test --manifest-path src-tauri/Cargo.toml
+```
+
+Windows 本地发布前执行：
+
+```bash
+pnpm run release:windows
+```
+
+## 许可证
+
+当前仓库尚未声明开源许可证。正式公开发布前，建议根据你的开源目标补充 `LICENSE` 文件。
