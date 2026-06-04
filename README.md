@@ -4,6 +4,10 @@
 
 应用基于 Tauri、React、TypeScript 和 Rust 构建。会话数据只在本机扫描和索引，不依赖云端服务。
 
+## 界面预览
+
+![AI 会话管理主界面](docs/images/app-overview.png)
+
 ## 功能特性
 
 - 多来源会话扫描：支持 Codex、Claude、Gemini 的本地会话目录。
