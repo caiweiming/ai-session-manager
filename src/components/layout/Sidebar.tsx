@@ -97,6 +97,7 @@ export function Sidebar({
     status: "idle" | "checking" | "up_to_date" | "update_available" | "error";
     latestRelease: GithubLatestRelease | null;
     errorMessage: string | null;
+    defaultReleasePageUrl: string;
     onCheckNow: () => void;
     onOpenReleasePage: (url: string) => void;
   };
@@ -589,9 +590,7 @@ export function Sidebar({
                   type="button"
                   className="btn-secondary update-popover-button"
                   onClick={() => {
-                    if (update.latestRelease) {
-                      update.onOpenReleasePage(update.latestRelease.url);
-                    }
+                    update.onOpenReleasePage(update.latestRelease?.url ?? update.defaultReleasePageUrl);
                   }}
                 >
                   打开发布页

@@ -5,7 +5,7 @@ import {
   parseGithubLatestRelease,
   type GithubLatestRelease,
 } from "../../../lib/updateChecker";
-import { createReleaseTagUrl } from "../../../lib/releaseConfig";
+import { createReleaseTagUrl, type ReleaseSource } from "../../../lib/releaseConfig";
 
 export type UpdateCheckStatus =
   | "idle"
@@ -61,16 +61,68 @@ const createScenarioRelease = (scenario: Exclude<UpdateScenario, "error">, curre
   };
 };
 
+const releaseSourcesFromLegacyUrl = (releasesLatestUrl: string | undefined): ReleaseSource[] => {
+  if (!releasesLatestUrl) {
+    return [];
+  }
+  return [
+    {
+      id: "github",
+      latestApiUrl: releasesLatestUrl,
+      releasesPageUrl: "https://github.com/caiweiming/ai-session-manager/releases",
+    },
+  ];
+};
+
+const checkLatestReleaseSource = async ({
+  fetchImpl,
+  source,
+}: {
+  fetchImpl: typeof fetch;
+  source: ReleaseSource;
+}) => {
+  const response = await fetchImpl(source.latestApiUrl);
+  if (!response.ok) {
+    throw new Error(
+      response.status === 404 ? "暂无公开发布版本" : `update request failed: ${response.status}`,
+    );
+  }
+
+  return parseGithubLatestRelease(await response.json());
+};
+
+const checkLatestReleaseSources = async ({
+  fetchImpl,
+  sources,
+}: {
+  fetchImpl: typeof fetch;
+  sources: ReleaseSource[];
+}) => {
+  let lastError: Error | null = null;
+
+  for (const source of sources) {
+    try {
+      return await checkLatestReleaseSource({ fetchImpl, source });
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  throw lastError ?? new Error("检查更新失败");
+};
+
 export function useUpdateChecker({
   currentVersion,
   releasesLatestUrl,
+  releaseSources,
   fetchImpl = fetch,
   devMode = import.meta.env.DEV,
   locationSearch = window.location.search,
   envScenario = import.meta.env.VITE_UPDATE_TEST_SCENARIO,
 }: {
   currentVersion: string;
-  releasesLatestUrl: string;
+  releasesLatestUrl?: string;
+  releaseSources?: ReleaseSource[];
   fetchImpl?: typeof fetch;
   devMode?: boolean;
   locationSearch?: string;
@@ -79,6 +131,9 @@ export function useUpdateChecker({
   const [status, setStatus] = useState<UpdateCheckStatus>("idle");
   const [latestRelease, setLatestRelease] = useState<GithubLatestRelease | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const releaseSourcesKey = (releaseSources ?? releaseSourcesFromLegacyUrl(releasesLatestUrl))
+    .map((source) => source.latestApiUrl)
+    .join("|");
 
   const runCheck = async () => {
     setStatus("checking");
@@ -100,15 +155,10 @@ export function useUpdateChecker({
       if (scenario) {
         release = createScenarioRelease(scenario, currentVersion);
       } else {
-        const response = await fetchImpl(releasesLatestUrl);
-        if (!response.ok) {
-          if (response.status === 404) {
-            throw new Error("暂无公开发布版本");
-          }
-          throw new Error(`update request failed: ${response.status}`);
-        }
-
-        release = parseGithubLatestRelease(await response.json());
+        release = await checkLatestReleaseSources({
+          fetchImpl,
+          sources: releaseSources ?? releaseSourcesFromLegacyUrl(releasesLatestUrl),
+        });
       }
 
       setLatestRelease(release);
@@ -128,7 +178,7 @@ export function useUpdateChecker({
 
   useEffect(() => {
     void runCheck();
-  }, [currentVersion, devMode, envScenario, locationSearch, releasesLatestUrl]);
+  }, [currentVersion, devMode, envScenario, locationSearch, releaseSourcesKey]);
 
   return {
     status,

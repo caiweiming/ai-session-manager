@@ -2836,6 +2836,26 @@ it("shows a no public release hint when GitHub latest release returns 404", asyn
   });
 });
 
+it("opens the default releases page when no latest release is available", async () => {
+  const openExternalSpy = vi.spyOn(api, "openExternalUrl").mockResolvedValue(undefined);
+  global.fetch = vi.fn(async () => ({
+    ok: false,
+    status: 404,
+    json: async () => ({}),
+  })) as typeof fetch;
+
+  await act(async () => {
+    render(<AppShell />);
+  });
+
+  await clickElement(screen.getByLabelText("app-update-entry"));
+  await clickElement(screen.getByRole("button", { name: "打开发布页" }));
+
+  expect(openExternalSpy).toHaveBeenCalledWith({
+    url: "https://github.com/caiweiming/ai-session-manager/releases",
+  });
+});
+
 it("renders the update popover outside the sidebar clipping container", async () => {
   global.fetch = vi.fn(async () => ({
     ok: true,

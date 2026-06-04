@@ -13,7 +13,7 @@ import { copyPlainText, normalizeToolClass } from "./inspectorPanelUtils";
 import { api } from "../../lib/tauriClient";
 import { formatToolName, getToolLogoSrc } from "../../lib/toolDisplay";
 import { normalizeWindowsDriveLetter } from "../../lib/pathDisplay";
-import { RELEASES_LATEST_API_URL } from "../../lib/releaseConfig";
+import { DEFAULT_RELEASES_PAGE_URL, RELEASE_SOURCES } from "../../lib/releaseConfig";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import packageJson from "../../../package.json";
 
@@ -89,7 +89,7 @@ export function AppShell() {
 
   const update = useUpdateChecker({
     currentVersion,
-    releasesLatestUrl: RELEASES_LATEST_API_URL,
+    releaseSources: RELEASE_SOURCES,
   });
 
   useNativeWindowSync(appSettings.themeMode);
@@ -316,6 +316,7 @@ export function AppShell() {
           status: update.status,
           latestRelease: update.latestRelease,
           errorMessage: update.errorMessage,
+          defaultReleasePageUrl: DEFAULT_RELEASES_PAGE_URL,
           onCheckNow: () => {
             void update.runCheck();
           },
