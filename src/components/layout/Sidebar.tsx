@@ -85,6 +85,7 @@ export function Sidebar({
   summary: OverviewSummary | null;
   settings: {
     state: AppSettings;
+    currentVersion: string;
     terminalOptions: TerminalOption[];
     supportsResumeInTerminal: boolean;
     onThemeChange: (theme: "light" | "dark" | "system") => void;
@@ -123,6 +124,7 @@ export function Sidebar({
   const { viewMode, onViewModeChange } = navigation;
   const {
     state: settingsState,
+    currentVersion,
     terminalOptions,
     supportsResumeInTerminal,
     onThemeChange,
@@ -541,6 +543,8 @@ export function Sidebar({
         open={open}
         onClose={() => setOpen(false)}
         settings={settingsState}
+        currentVersion={currentVersion}
+        aboutUpdate={open ? update : undefined}
         terminalOptions={terminalOptions}
         supportsResumeInTerminal={supportsResumeInTerminal}
         onThemeChange={onThemeChange}

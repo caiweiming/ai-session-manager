@@ -1,14 +1,37 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { RELEASE_SOURCES } from "../../lib/releaseConfig";
 import type { AppSettings, TerminalOption } from "../../lib/tauriClient";
+import type { GithubLatestRelease } from "../../lib/updateChecker";
 import { CustomSelect } from "../ui/CustomSelect";
 
-type SettingsSectionKey = "scan" | "theme" | "terminal" | "security";
+type SettingsSectionKey = "scan" | "theme" | "terminal" | "security" | "about";
+type AboutUpdateStatus = "idle" | "checking" | "up_to_date" | "update_available" | "error";
+type AboutUpdate = {
+  status: AboutUpdateStatus;
+  latestRelease: GithubLatestRelease | null;
+  errorMessage: string | null;
+  defaultReleasePageUrl: string;
+  onCheckNow: () => void;
+  onOpenReleasePage: (url: string) => void;
+};
 const SECTION_SCROLL_TOP_GAP = 28;
+const SETTINGS_SECTIONS: Array<{ key: SettingsSectionKey; label: string }> = [
+  { key: "scan", label: "扫描规则" },
+  { key: "theme", label: "外观主题" },
+  { key: "terminal", label: "恢复终端" },
+  { key: "security", label: "删除行为" },
+  { key: "about", label: "关于" },
+];
+const SETTINGS_SECTION_LABELS = Object.fromEntries(
+  SETTINGS_SECTIONS.map((section) => [section.key, section.label]),
+) as Record<SettingsSectionKey, string>;
 
 export function SettingsModal({
   open,
   onClose,
   settings,
+  currentVersion,
+  aboutUpdate,
   terminalOptions,
   supportsResumeInTerminal,
   onThemeChange,
@@ -19,6 +42,8 @@ export function SettingsModal({
   open: boolean;
   onClose: () => void;
   settings: AppSettings;
+  currentVersion?: string;
+  aboutUpdate?: AboutUpdate;
   terminalOptions: TerminalOption[];
   supportsResumeInTerminal: boolean;
   onThemeChange: (theme: "light" | "dark" | "system") => void;
@@ -34,26 +59,81 @@ export function SettingsModal({
     claude: true,
     gemini: true,
   };
+  const updateStatusText =
+    aboutUpdate?.status === "checking"
+      ? "正在检查更新..."
+      : aboutUpdate?.status === "update_available" && aboutUpdate.latestRelease
+        ? `发现新版本 ${aboutUpdate.latestRelease.tagName}`
+        : aboutUpdate?.status === "up_to_date"
+          ? "当前已是最新版本。"
+          : aboutUpdate?.status === "error"
+            ? (aboutUpdate.errorMessage ?? "暂时无法检查更新")
+            : "可手动检查是否有新版本。";
   const [activeSection, setActiveSection] = useState<SettingsSectionKey>("scan");
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const pendingProgrammaticSectionRef = useRef<SettingsSectionKey | null>(null);
   const scanSectionRef = useRef<HTMLDivElement | null>(null);
   const themeSectionRef = useRef<HTMLDivElement | null>(null);
   const terminalSectionRef = useRef<HTMLDivElement | null>(null);
   const securitySectionRef = useRef<HTMLDivElement | null>(null);
+  const aboutSectionRef = useRef<HTMLDivElement | null>(null);
 
   const sectionRefMap: Record<SettingsSectionKey, RefObject<HTMLDivElement | null>> = {
     scan: scanSectionRef,
     theme: themeSectionRef,
     terminal: terminalSectionRef,
     security: securitySectionRef,
+    about: aboutSectionRef,
+  };
+
+  const getSectionScrollTop = (container: HTMLDivElement, target: HTMLDivElement) => {
+    const containerRect = container.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    return Math.max(0, container.scrollTop + targetRect.top - containerRect.top - SECTION_SCROLL_TOP_GAP);
+  };
+
+  const getSectionTopDistance = (container: HTMLDivElement, target: HTMLDivElement) => {
+    const containerRect = container.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    return Math.abs(targetRect.top - containerRect.top - SECTION_SCROLL_TOP_GAP);
+  };
+
+  const resolveActiveSectionFromScroll = () => {
+    const container = contentRef.current;
+    if (!container) return;
+    let nextSection: SettingsSectionKey = "scan";
+    let closestDistance = Number.POSITIVE_INFINITY;
+
+    for (const section of SETTINGS_SECTIONS) {
+      const target = sectionRefMap[section.key].current;
+      if (!target) continue;
+      const distance = getSectionTopDistance(container, target);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        nextSection = section.key;
+      }
+    }
+
+    const pendingSection = pendingProgrammaticSectionRef.current;
+    if (pendingSection && pendingSection !== nextSection) {
+      setActiveSection(pendingSection);
+      return;
+    }
+
+    pendingProgrammaticSectionRef.current = null;
+    setActiveSection(nextSection);
   };
 
   const scrollToSection = (section: SettingsSectionKey) => {
+    pendingProgrammaticSectionRef.current = section;
     setActiveSection(section);
     const container = contentRef.current;
     const target = sectionRefMap[section].current;
-    if (!container || !target) return;
-    const top = Math.max(0, target.offsetTop - SECTION_SCROLL_TOP_GAP);
+    if (!container || !target) {
+      pendingProgrammaticSectionRef.current = null;
+      return;
+    }
+    const top = getSectionScrollTop(container, target);
     if (typeof container.scrollTo === "function") {
       container.scrollTo({
         top,
@@ -66,6 +146,7 @@ export function SettingsModal({
 
   useEffect(() => {
     if (!open) return;
+    pendingProgrammaticSectionRef.current = null;
     setActiveSection("scan");
     if (contentRef.current) {
       contentRef.current.scrollTop = 0;
@@ -96,7 +177,7 @@ export function SettingsModal({
                 <line x1="12" y1="8" x2="12" y2="16" />
                 <line x1="8" y1="12" x2="16" y2="12" />
               </svg>
-              扫描与路径
+              {SETTINGS_SECTION_LABELS.scan}
             </button>
             <button
               type="button"
@@ -106,7 +187,7 @@ export function SettingsModal({
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
               </svg>
-              外观与主题
+              {SETTINGS_SECTION_LABELS.theme}
             </button>
             <button
               type="button"
@@ -119,7 +200,7 @@ export function SettingsModal({
                 <path d="M8 9h8" />
                 <path d="M10 5h4" />
               </svg>
-              恢复终端
+              {SETTINGS_SECTION_LABELS.terminal}
             </button>
             <button
               type="button"
@@ -130,17 +211,29 @@ export function SettingsModal({
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
-              安全与清理
+              {SETTINGS_SECTION_LABELS.security}
+            </button>
+            <button
+              type="button"
+              className={`modal-nav-item${activeSection === "about" ? " active" : ""}`}
+              onClick={() => scrollToSection("about")}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4" />
+                <path d="M12 8h.01" />
+              </svg>
+              {SETTINGS_SECTION_LABELS.about}
             </button>
           </div>
-          <div className="modal-content-area" ref={contentRef}>
+          <div className="modal-content-area" ref={contentRef} onScroll={resolveActiveSectionFromScroll}>
             <section className="settings-group settings-section" ref={scanSectionRef} data-section="scan">
-              <div className="settings-title">
+              <h4 className="settings-title">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
                   <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
                 </svg>
-                扫描规则配置
-              </div>
+                {SETTINGS_SECTION_LABELS.scan}
+              </h4>
               <div className="settings-row">
                 <div className="settings-label">
                   <span className="settings-name">默认扫描来源</span>
@@ -183,12 +276,12 @@ export function SettingsModal({
             </section>
 
             <section className="settings-group settings-group-divider settings-section" ref={themeSectionRef} data-section="theme">
-              <div className="settings-title">
+              <h4 className="settings-title">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
                   <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                 </svg>
-                界面颜色主题
-              </div>
+                {SETTINGS_SECTION_LABELS.theme}
+              </h4>
               <div className="settings-desc theme-description">选择您偏好的应用外观，或使其跟随操作系统自动切换。</div>
               <div className="theme-card-group">
                 {["light", "dark", "system"].map((t) => (
@@ -211,15 +304,15 @@ export function SettingsModal({
               ref={terminalSectionRef}
               data-section="terminal"
             >
-              <div className="settings-title">
+              <h4 className="settings-title">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
                   <path d="M4 17h16" />
                   <path d="M6 13h12" />
                   <path d="M8 9h8" />
                   <path d="M10 5h4" />
                 </svg>
-                恢复对话终端
-              </div>
+                {SETTINGS_SECTION_LABELS.terminal}
+              </h4>
               <div className="settings-row">
                 <div className="settings-label">
                   <span className="settings-name">恢复会话时使用的终端</span>
@@ -245,13 +338,13 @@ export function SettingsModal({
               ref={securitySectionRef}
               data-section="security"
             >
-              <div className="settings-title">
+              <h4 className="settings-title">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
-                删除行为默认值
-              </div>
+                {SETTINGS_SECTION_LABELS.security}
+              </h4>
               <div className="settings-row">
                 <div className="settings-label">
                   <span className="settings-name">默认永久删除（不进回收站）</span>
@@ -261,6 +354,66 @@ export function SettingsModal({
                   <input type="checkbox" checked={hardDelete} onChange={(e) => onHardDeleteChange(e.target.checked)} />
                   <span className="slider" />
                 </label>
+              </div>
+            </section>
+
+            <section
+              className="settings-group settings-group-divider settings-section"
+              ref={aboutSectionRef}
+              data-section="about"
+            >
+              <h4 className="settings-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 16v-4" />
+                  <path d="M12 8h.01" />
+                </svg>
+                {SETTINGS_SECTION_LABELS.about}
+              </h4>
+              <div className="settings-about-panel">
+                <div className="settings-about-primary">
+                  <span className="settings-about-name">AI 会话管理</span>
+                  <span className="settings-about-version">版本 {currentVersion ?? "0.1.1"}</span>
+                </div>
+                <p className="settings-about-desc">用于本地汇总、检索和恢复 AI 工具会话记录。</p>
+                <div className="settings-about-update">
+                  <span className={`settings-about-update-status${aboutUpdate?.status === "error" ? " error" : ""}`}>
+                    {updateStatusText}
+                  </span>
+                </div>
+                <div className="settings-about-actions" aria-label="关于操作">
+                  {aboutUpdate ? (
+                    <>
+                      <button
+                        type="button"
+                        className="settings-about-link"
+                        onClick={aboutUpdate.onCheckNow}
+                        disabled={aboutUpdate.status === "checking"}
+                      >
+                        {aboutUpdate.status === "checking" ? "检查中..." : "检查更新"}
+                      </button>
+                      {aboutUpdate.status === "update_available" && aboutUpdate.latestRelease ? (
+                        <button
+                          type="button"
+                          className="settings-about-link"
+                          onClick={() => aboutUpdate.onOpenReleasePage(aboutUpdate.latestRelease?.url ?? aboutUpdate.defaultReleasePageUrl)}
+                        >
+                          打开最新版本
+                        </button>
+                      ) : null}
+                    </>
+                  ) : null}
+                  {RELEASE_SOURCES.map((source) => (
+                    <button
+                      key={source.id}
+                      type="button"
+                      onClick={() => aboutUpdate?.onOpenReleasePage(source.releasesPageUrl)}
+                      className="settings-about-link"
+                    >
+                      {source.id === "github" ? "GitHub 发布页" : "Gitee 发布页"}
+                    </button>
+                  ))}
+                </div>
               </div>
             </section>
           </div>

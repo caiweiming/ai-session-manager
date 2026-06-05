@@ -161,6 +161,7 @@ export function AppShell() {
 
   const settings = {
     state: appSettings,
+    currentVersion,
     terminalOptions: platformCapabilities.terminalOptions,
     supportsResumeInTerminal: platformCapabilities.supportsResumeInTerminal,
     onThemeChange: (theme: "light" | "dark" | "system") => {
