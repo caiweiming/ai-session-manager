@@ -272,7 +272,7 @@ export function Sidebar({
       <div className="brand">
         <div className="brand-left">
           <div className="brand-icon" aria-hidden>
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none">
               <path
                 d="M5.2 6.1h13.6c1.16 0 2.1.94 2.1 2.1v7.2c0 1.16-.94 2.1-2.1 2.1H12l-4.2 3.8v-3.8H5.2c-1.16 0-2.1-.94-2.1-2.1V8.2c0-1.16.94-2.1 2.1-2.1z"
                 fill="currentColor"
@@ -283,22 +283,24 @@ export function Sidebar({
               <path d="M17.2 3.7l.58 1.38 1.39.58-1.39.58-.58 1.39-.58-1.39-1.38-.58 1.38-.58.58-1.38z" fill="currentColor" />
             </svg>
           </div>
-          <span>AI 会话管理</span>
-          <div className="brand-version-wrap">
-            <button
-              ref={updateEntryRef}
-              type="button"
-              className={`brand-version brand-version-button${update.status === "update_available" ? " has-update" : ""}`}
-              title={`当前版本 v${update.currentVersion}`}
-              aria-label="app-update-entry"
-              onClick={() => {
-                syncUpdatePopoverPosition();
-                setUpdatePopoverOpen((value) => !value);
-              }}
-            >
-              <span>{updateEntryText}</span>
-              {update.status === "update_available" ? <span className="brand-version-dot" aria-hidden /> : null}
-            </button>
+          <div className="brand-meta">
+            <span className="brand-title">AI 会话管理</span>
+            <div className="brand-version-wrap">
+              <button
+                ref={updateEntryRef}
+                type="button"
+                className={`brand-version brand-version-button${update.status === "update_available" ? " has-update" : ""}`}
+                title={`当前版本 v${update.currentVersion}`}
+                aria-label="app-update-entry"
+                onClick={() => {
+                  syncUpdatePopoverPosition();
+                  setUpdatePopoverOpen((value) => !value);
+                }}
+              >
+                <span>{updateEntryText}</span>
+                {update.status === "update_available" ? <span className="brand-version-dot" aria-hidden /> : null}
+              </button>
+            </div>
           </div>
         </div>
         <button className="btn-settings-icon" onClick={() => setOpen(true)}>

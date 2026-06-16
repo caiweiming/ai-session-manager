@@ -360,6 +360,19 @@ afterEach(() => {
   global.fetch = originalFetch;
 });
 
+it("places app version under the brand title next to the logo", async () => {
+  await act(async () => {
+    render(<AppShell />);
+  });
+
+  const brand = document.querySelector(".brand") as HTMLElement;
+  const brandText = within(brand).getByText("AI 会话管理");
+  const brandMeta = brandText.closest(".brand-meta");
+
+  expect(brandMeta).not.toBeNull();
+  expect(brandMeta).toContainElement(screen.getByLabelText("app-update-entry"));
+});
+
 it("startup triggers refresh_sessions", async () => {
   render(<AppShell />);
 
