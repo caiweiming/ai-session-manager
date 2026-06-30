@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::Result;
@@ -229,29 +229,121 @@ fn spawn_terminal(terminal: &str, workspace: &str, shell_command: &str) -> Resul
 }
 
 fn spawn_terminal_app(shell_command: &str) -> Result<()> {
-    Command::new("osascript")
-        .arg("-e")
-        .arg(format!(
-            "tell application \"Terminal\" to do script {}",
-            apple_script_string(&shell_command)
-        ))
-        .arg("-e")
-        .arg("tell application \"Terminal\" to activate")
+    let profile_path = create_terminal_resume_launcher(shell_command)?;
+    Command::new("open")
+        .args(["-a", "Terminal"])
+        .arg(profile_path)
         .spawn()?;
     Ok(())
 }
 
+fn create_terminal_resume_launcher(shell_command: &str) -> Result<PathBuf> {
+    let base_name = format!(
+        "ai-session-resume-{}-{}",
+        std::process::id(),
+        chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+    );
+    let temp_dir = std::env::temp_dir();
+    let script_path = temp_dir.join(format!("{base_name}.command"));
+    let profile_path = temp_dir.join(format!("{base_name}.terminal"));
+
+    std::fs::write(
+        &script_path,
+        terminal_resume_launcher_script(shell_command, &profile_path),
+    )?;
+    std::fs::write(&profile_path, terminal_resume_profile_plist(&script_path))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = std::fs::metadata(&script_path)?.permissions();
+        permissions.set_mode(0o700);
+        std::fs::set_permissions(&script_path, permissions)?;
+    }
+
+    Ok(profile_path)
+}
+
+fn terminal_resume_launcher_script(shell_command: &str, profile_path: &Path) -> String {
+    format!(
+        "#!/bin/sh\nrm -f -- \"$0\" {}\nexec \"${{SHELL:-/bin/sh}}\" -lc {}\n",
+        shell_single_quote(&profile_path.to_string_lossy()),
+        shell_single_quote(shell_command)
+    )
+}
+
+fn terminal_resume_profile_plist(script_path: &Path) -> String {
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CommandString</key>
+	<string>{}</string>
+	<key>RunCommandAsShell</key>
+	<true/>
+	<key>name</key>
+	<string>AI Session Resume</string>
+	<key>type</key>
+	<string>Window Settings</string>
+</dict>
+</plist>
+"#,
+        xml_escape(&script_path.to_string_lossy())
+    )
+}
+
+fn xml_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
 fn spawn_iterm(shell_command: &str) -> Result<()> {
+    let script_path = create_iterm_resume_launcher(shell_command)?;
     Command::new("osascript")
         .arg("-e")
-        .arg(format!(
-            "tell application \"iTerm\" to create window with default profile command {}",
-            apple_script_string(shell_command)
-        ))
+        .arg(iterm_resume_script(&script_path))
         .arg("-e")
         .arg("tell application \"iTerm\" to activate")
         .spawn()?;
     Ok(())
+}
+
+fn create_iterm_resume_launcher(shell_command: &str) -> Result<PathBuf> {
+    let script_path = std::env::temp_dir().join(format!(
+        "ai-session-resume-iterm-{}-{}.command",
+        std::process::id(),
+        chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+    ));
+    std::fs::write(&script_path, iterm_resume_launcher_script(shell_command))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = std::fs::metadata(&script_path)?.permissions();
+        permissions.set_mode(0o700);
+        std::fs::set_permissions(&script_path, permissions)?;
+    }
+
+    Ok(script_path)
+}
+
+fn iterm_resume_launcher_script(shell_command: &str) -> String {
+    format!(
+        "#!/bin/sh\nrm -f -- \"$0\"\nexec \"${{SHELL:-/bin/sh}}\" -lc {}\n",
+        shell_single_quote(shell_command)
+    )
+}
+
+fn iterm_resume_script(script_path: &Path) -> String {
+    format!(
+        "tell application \"iTerm\" to create window with default profile command {}",
+        apple_script_string(&script_path.to_string_lossy())
+    )
 }
 
 fn apple_script_string(value: &str) -> String {
@@ -312,5 +404,54 @@ mod tests {
         .expect_err("invalid preference should error before spawning");
 
         assert_eq!(err.to_string(), "unsupported terminal preference: bogus");
+    }
+
+    #[test]
+    fn terminal_profile_should_launch_script_as_session_command() {
+        let profile =
+            terminal_resume_profile_plist(&PathBuf::from("/tmp/ai-session-resume.command"));
+
+        assert!(profile.contains("<key>CommandString</key>"));
+        assert!(profile.contains("<string>/tmp/ai-session-resume.command</string>"));
+        assert!(profile.contains("<key>RunCommandAsShell</key>\n\t<true/>"));
+    }
+
+    #[test]
+    fn terminal_launcher_script_should_remove_profile_and_execute_restore_command() {
+        let script = terminal_resume_launcher_script(
+            "cd '/tmp/work' && codex resume 'session-1'",
+            &PathBuf::from("/tmp/ai-session-resume.terminal"),
+        );
+
+        assert!(script.starts_with("#!/bin/sh\n"));
+        assert!(script.contains("rm -f -- \"$0\" '/tmp/ai-session-resume.terminal'"));
+        assert!(script.contains("exec \"${SHELL:-/bin/sh}\" -lc 'cd '\"'\"'/tmp/work'\"'\"' && codex resume '\"'\"'session-1'\"'\"''"));
+    }
+
+    #[test]
+    fn iterm_script_should_launch_script_as_profile_command() {
+        let script = iterm_resume_script(&PathBuf::from("/tmp/ai-session-resume.command"));
+
+        assert!(
+            script.contains("create window with default profile command"),
+            "iTerm should launch a command instead of feeding stdin to an interactive shell"
+        );
+        assert!(
+            script.contains("\"/tmp/ai-session-resume.command\""),
+            "iTerm should launch the temporary restore script"
+        );
+        assert!(
+            !script.contains("write text"),
+            "iTerm should not type the restore command into zsh startup stdin"
+        );
+    }
+
+    #[test]
+    fn iterm_launcher_script_should_execute_restore_command() {
+        let script = iterm_resume_launcher_script("cd '/tmp/work' && codex resume 'session-1'");
+
+        assert!(script.starts_with("#!/bin/sh\n"));
+        assert!(script.contains("rm -f -- \"$0\""));
+        assert!(script.contains("exec \"${SHELL:-/bin/sh}\" -lc 'cd '\"'\"'/tmp/work'\"'\"' && codex resume '\"'\"'session-1'\"'\"''"));
     }
 }
