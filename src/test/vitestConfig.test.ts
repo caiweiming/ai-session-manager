@@ -13,5 +13,6 @@ describe("vitest.config", () => {
     }
 
     expect(exclude).toContain(".worktrees/**");
+    expect(exclude).toContain("scripts/**/*.test.mjs");
   });
 });

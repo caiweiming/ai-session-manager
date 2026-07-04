@@ -5,8 +5,14 @@ import { fileURLToPath } from "node:url";
 const APP_SLUG = "ai-session-manager";
 const DEFAULT_PLATFORM = "windows";
 const DEFAULT_ARCH_BY_PLATFORM = {
+  linux: "x64",
   macos: "universal",
   windows: "x64",
+};
+const MACOS_TARGET_BY_ARCH = {
+  arm64: "aarch64-apple-darwin",
+  universal: "universal-apple-darwin",
+  x64: "x86_64-apple-darwin",
 };
 
 async function fileExists(filePath) {
@@ -49,6 +55,18 @@ async function copyArtifact({ source, destination, label }) {
   return { label, source, destination };
 }
 
+function resolveReleaseDir({ rootDir, platform, arch }) {
+  if (platform === "macos") {
+    const target = MACOS_TARGET_BY_ARCH[arch];
+    if (target === undefined) {
+      throw new Error(`Unsupported macOS release arch: ${arch}`);
+    }
+    return path.join(rootDir, "src-tauri", "target", target, "release");
+  }
+
+  return path.join(rootDir, "src-tauri", "target", "release");
+}
+
 export async function collectReleaseAssets({
   rootDir = process.cwd(),
   outputDir = path.join(rootDir, "release-assets"),
@@ -60,12 +78,15 @@ export async function collectReleaseAssets({
   }
 
   const version = await readPackageVersion(rootDir);
-  const releaseDir = path.join(rootDir, "src-tauri", "target", "release");
+  const releaseDir = resolveReleaseDir({ rootDir, platform, arch });
   await rm(outputDir, { force: true, recursive: true });
   await mkdir(outputDir, { recursive: true });
 
   if (platform === "macos") {
     return collectMacosReleaseAssets({ releaseDir, outputDir, version, arch });
+  }
+  if (platform === "linux") {
+    return collectLinuxReleaseAssets({ releaseDir, outputDir, version, arch });
   }
   if (platform === "windows") {
     return collectWindowsReleaseAssets({ releaseDir, outputDir, version, arch });
@@ -108,6 +129,35 @@ async function collectWindowsReleaseAssets({ releaseDir, outputDir, version, arc
       label: "msi",
       source: path.join(msiDir, msiFile),
       destination: path.join(outputDir, `${prefix}.msi`),
+    }),
+  ]);
+}
+
+async function collectLinuxReleaseAssets({ releaseDir, outputDir, version, arch }) {
+  const appImageDir = path.join(releaseDir, "bundle", "appimage");
+  const debDir = path.join(releaseDir, "bundle", "deb");
+  const prefix = `${APP_SLUG}-v${version}-linux-${arch}`;
+
+  const appImageFile = await firstMatchingFile(appImageDir, (name) => name.toLowerCase().endsWith(".appimage"));
+  const debFile = await firstMatchingFile(debDir, (name) => name.toLowerCase().endsWith(".deb"));
+
+  if (appImageFile === null) {
+    throw new Error(`Missing Linux AppImage artifact in ${appImageDir}`);
+  }
+  if (debFile === null) {
+    throw new Error(`Missing Linux deb artifact in ${debDir}`);
+  }
+
+  return Promise.all([
+    copyArtifact({
+      label: "appimage",
+      source: path.join(appImageDir, appImageFile),
+      destination: path.join(outputDir, `${prefix}.AppImage`),
+    }),
+    copyArtifact({
+      label: "deb",
+      source: path.join(debDir, debFile),
+      destination: path.join(outputDir, `${prefix}.deb`),
     }),
   ]);
 }

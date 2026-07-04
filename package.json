@@ -1,14 +1,15 @@
 {
   "name": "ai-session-manager",
   "private": true,
-  "version": "0.1.3",
+  "version": "0.1.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "release:assets": "node scripts/release-assets.mjs",
-    "release:macos": "tauri build && node scripts/release-assets.mjs --platform macos",
+    "release:linux": "tauri build --bundles appimage,deb && node scripts/release-assets.mjs --platform linux --arch x64",
+    "release:macos": "tauri build --target universal-apple-darwin && node scripts/release-assets.mjs --platform macos --arch universal",
     "release:windows": "tauri build && node scripts/release-assets.mjs",
     "test": "vitest run",
     "test:watch": "vitest",

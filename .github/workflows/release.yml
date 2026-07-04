@@ -21,6 +21,9 @@ jobs:
           - os: macos-latest
             script: release:macos
             artifact-name: release-assets-macos
+          - os: ubuntu-latest
+            script: release:linux
+            artifact-name: release-assets-linux
 
     runs-on: ${{ matrix.os }}
 
@@ -37,6 +40,12 @@ jobs:
           cache: pnpm
 
       - uses: dtolnay/rust-toolchain@stable
+
+      - if: matrix.os == 'macos-latest'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
       - run: pnpm install --frozen-lockfile
 
