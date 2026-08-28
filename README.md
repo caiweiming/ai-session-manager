@@ -128,6 +128,25 @@ pnpm run release:macos
 ai-session-manager-v0.1.1-macos-universal.dmg
 ```
 
+### 未签名 macOS 版本打开方式
+
+未签名版本只建议在确认下载来源可信时使用。推荐让用户优先使用 Finder 手动信任：
+
+1. 下载 `ai-session-manager-vX.Y.Z-macos-universal.dmg`。
+2. 双击打开 DMG，把 `AI会话管理.app` 拖到 `Applications`。
+3. 打开 Finder，进入 `Applications`。
+4. 按住 `Control` 点击 `AI会话管理.app`，选择“打开”。
+5. 在系统提示中再次点击“打开”。
+
+如果已经双击打开并被拦截，可以进入 `系统设置` -> `隐私与安全性`，在安全提示区域点击“仍要打开”或“Open Anyway”，再按提示确认打开。
+
+确认来源可信时，也可以用命令移除下载隔离属性：
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/AI会话管理.app"
+open "/Applications/AI会话管理.app"
+```
+
 如果已经完成 Tauri 构建，只想重新整理英文发布文件名：
 
 ```bash
@@ -160,4 +179,3 @@ pnpm run release:windows
 ## 许可证
 
 本项目基于 MIT License 开源，详见 [LICENSE](./LICENSE)。
-
