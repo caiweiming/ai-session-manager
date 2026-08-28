@@ -124,19 +124,13 @@ test("release workflow installs both Rust targets required for universal macOS b
   assert.match(workflow, /rustup target add aarch64-apple-darwin x86_64-apple-darwin/);
 });
 
-test("release workflow optionally signs and verifies macOS release assets", async () => {
+test("release workflow builds macOS artifacts without signing configuration", async () => {
   const workflow = await readFile(path.join(repoRoot, ".github", "workflows", "release.yml"), "utf8");
 
-  assert.match(workflow, /APPLE_SIGNING_IDENTITY/);
-  assert.match(workflow, /APPLE_CERTIFICATE/);
-  assert.match(workflow, /APPLE_CERTIFICATE_PASSWORD/);
-  assert.match(workflow, /APPLE_ID/);
-  assert.match(workflow, /APPLE_PASSWORD/);
-  assert.match(workflow, /APPLE_TEAM_ID/);
-  assert.match(workflow, /MACOS_SIGNING_ENABLED=true/);
-  assert.match(workflow, /No Apple signing secrets found; building unsigned macOS artifact/);
-  assert.doesNotMatch(workflow, /Missing required GitHub secret/);
-  assert.match(workflow, /spctl -a -t open --context context:primary-signature -vv release-assets\/\*macos\*\.dmg/);
+  assert.doesNotMatch(workflow, /APPLE_CERTIFICATE/);
+  assert.doesNotMatch(workflow, /APPLE_SIGNING_IDENTITY/);
+  assert.doesNotMatch(workflow, /security import/);
+  assert.doesNotMatch(workflow, /spctl -a/);
 });
 
 test("README documents how to open unsigned macOS builds", async () => {
