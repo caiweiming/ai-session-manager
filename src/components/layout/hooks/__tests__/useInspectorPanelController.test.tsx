@@ -47,7 +47,6 @@ it("opens subagent summary and loads selected subagent detail", async () => {
       detail: defaultSessionDetail,
       subagentRows: defaultSubagentRows,
       subagentsLoading: false,
-      defaultHardDelete: false,
       handleDeleteSession,
       handleExportSession,
     }),
@@ -78,7 +77,6 @@ it("shows info toast when there are no subagent sessions", () => {
       detail: defaultSessionDetail,
       subagentRows: [],
       subagentsLoading: false,
-      defaultHardDelete: false,
       handleDeleteSession: vi.fn(async () => true),
       handleExportSession: vi.fn(async () => defaultExportResult),
     }),
@@ -95,7 +93,7 @@ it("shows info toast when there are no subagent sessions", () => {
   });
 });
 
-it("opens hard delete confirm before confirming deletion", async () => {
+it("deletes inspector sessions to the trash", async () => {
   const handleDeleteSession = vi.fn(async () => true);
 
   const { result } = renderHook(() =>
@@ -103,23 +101,13 @@ it("opens hard delete confirm before confirming deletion", async () => {
       detail: defaultSessionDetail,
       subagentRows: defaultSubagentRows,
       subagentsLoading: false,
-      defaultHardDelete: false,
       handleDeleteSession,
       handleExportSession: vi.fn(async () => defaultExportResult),
     }),
   );
 
   act(() => {
-    result.current.setHardDelete(true);
-  });
-
-  act(() => {
     result.current.handleDeleteAction();
-  });
-  expect(result.current.hardDeleteConfirmOpen).toBe(true);
-
-  act(() => {
-    result.current.confirmHardDelete();
   });
 
   await waitFor(() => {
@@ -127,7 +115,7 @@ it("opens hard delete confirm before confirming deletion", async () => {
       defaultSessionDetail.sourceTool,
       defaultSessionDetail.sourceId,
       {
-        hardDelete: true,
+        hardDelete: false,
         cascadeSubagents: true,
       },
     );
@@ -140,7 +128,6 @@ it("opens conversation modal immediately without entering preparing overlay stat
       detail: defaultSessionDetail,
       subagentRows: defaultSubagentRows,
       subagentsLoading: false,
-      defaultHardDelete: false,
       handleDeleteSession: vi.fn(async () => true),
       handleExportSession: vi.fn(async () => defaultExportResult),
     }),

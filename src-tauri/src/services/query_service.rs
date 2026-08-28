@@ -431,24 +431,40 @@ pub fn list_subagent_sessions(
 }
 
 pub fn get_overview_summary(conn: &Connection) -> anyhow::Result<OverviewSummaryData> {
-    let active_main_scope = "from sessions
-        where deleted_at is null
-          and deleted_by_user=0
-          and is_subagent=0";
+    let active_visible_scope = "from sessions s
+        where s.deleted_at is null
+          and s.deleted_by_user=0
+          and (
+            s.is_subagent=0
+            or (
+              s.source_tool='claude'
+              and s.is_subagent=1
+              and trim(coalesce(s.parent_source_id, '')) <> ''
+              and not exists (
+                select 1
+                from sessions parent
+                where parent.source_tool=s.source_tool
+                  and parent.source_id=s.parent_source_id
+                  and parent.is_subagent=0
+                  and parent.deleted_at is null
+                  and parent.deleted_by_user=0
+              )
+            )
+          )";
 
     let total_workspaces: i64 = conn.query_row(
         &format!(
-            "select count(distinct workspace_path) {active_main_scope} and trim(workspace_path)<>''"
+            "select count(distinct s.workspace_path) {active_visible_scope} and trim(s.workspace_path)<>''"
         ),
         [],
         |row| row.get(0),
     )?;
     let total_sessions: i64 =
-        conn.query_row(&format!("select count(*) {active_main_scope}"), [], |row| {
+        conn.query_row(&format!("select count(*) {active_visible_scope}"), [], |row| {
             row.get(0)
         })?;
     let active_sessions_7d: i64 = conn.query_row(
-        &format!("select count(*) {active_main_scope} and updated_at>=?1"),
+        &format!("select count(*) {active_visible_scope} and s.updated_at>=?1"),
         params![shanghai_time_days_ago(7)],
         |row| row.get(0),
     )?;
@@ -461,21 +477,20 @@ pub fn get_overview_summary(conn: &Connection) -> anyhow::Result<OverviewSummary
         |row| row.get(0),
     )?;
     let total_size_bytes: i64 = conn.query_row(
-        &format!("select coalesce(sum(source_file_size), 0) {active_main_scope}"),
+        &format!("select coalesce(sum(s.source_file_size), 0) {active_visible_scope}"),
         [],
         |row| row.get(0),
     )?;
 
     let mut stmt = conn.prepare(
-        "select source_tool,
+        &format!(
+            "select s.source_tool,
                 count(*) as session_count,
-                coalesce(sum(source_file_size), 0) as total_size_bytes
-         from sessions
-         where deleted_at is null
-           and deleted_by_user=0
-           and is_subagent=0
-         group by source_tool
-         order by session_count desc, source_tool asc",
+                coalesce(sum(s.source_file_size), 0) as total_size_bytes
+         {active_visible_scope}
+         group by s.source_tool
+         order by session_count desc, s.source_tool asc"
+        ),
     )?;
     let tool_stats = stmt
         .query_map([], |row| {
@@ -495,4 +510,56 @@ pub fn get_overview_summary(conn: &Connection) -> anyhow::Result<OverviewSummary
         total_size_bytes,
         tool_stats,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn overview_summary_counts_visible_claude_orphan_subagents() {
+        let conn = Connection::open_in_memory().expect("open in-memory database");
+        conn.execute_batch(
+            "create table sessions (
+                source_tool text not null,
+                source_id text not null,
+                parent_source_id text,
+                title text not null,
+                source_path text not null,
+                workspace_path text not null,
+                is_subagent integer not null,
+                source_file_size integer not null,
+                updated_at text not null,
+                deleted_at text,
+                deleted_by_user integer not null
+            )",
+        )
+        .expect("create sessions table");
+
+        let insert = "insert into sessions (
+                source_tool, source_id, parent_source_id, title, source_path, workspace_path,
+                is_subagent, source_file_size, updated_at, deleted_at, deleted_by_user
+            ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, null, 0)";
+        let timestamp = "2026-08-25 17:00:00";
+        conn.execute(insert, params!["claude", "main-1", Option::<String>::None, "主会话", "/source/main", "/project", 0, 10, timestamp])
+            .expect("insert Claude main session");
+        conn.execute(insert, params!["claude", "orphan-1", "missing-main", "孤立子会话", "/source/orphan", "/project", 1, 20, timestamp])
+            .expect("insert Claude orphan subagent");
+        conn.execute(insert, params!["claude", "child-1", "main-1", "关联子会话", "/source/child", "/project", 1, 30, timestamp])
+            .expect("insert Claude attached subagent");
+        conn.execute(insert, params!["codex", "main-1", Option::<String>::None, "Codex 会话", "/source/codex", "/project", 0, 40, timestamp])
+            .expect("insert Codex main session");
+
+        let summary = get_overview_summary(&conn).expect("load overview summary");
+        let claude = summary
+            .tool_stats
+            .iter()
+            .find(|tool| tool.source_tool == "claude")
+            .expect("Claude summary");
+
+        assert_eq!(summary.total_sessions, 3);
+        assert_eq!(summary.total_size_bytes, 70);
+        assert_eq!(claude.session_count, 2);
+        assert_eq!(claude.total_size_bytes, 30);
+    }
 }

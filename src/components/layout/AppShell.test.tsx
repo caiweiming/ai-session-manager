@@ -86,7 +86,7 @@ const expandAllGroups = async () => {
     expect(screen.getByLabelText("group-expand-toggle")).toBeEnabled();
   });
   const button = screen.getByLabelText("group-expand-toggle") as HTMLButtonElement;
-  if (!button.disabled && button.textContent?.includes("全部展开")) {
+  if (!button.disabled && button.title.includes("展开")) {
     fireEvent.click(button);
   }
 };
@@ -388,14 +388,24 @@ it("startup triggers refresh_sessions", async () => {
   expect(screen.getByText("真实会话 Beta：迁移旧日志索引")).toBeInTheDocument();
   expect(screen.getByLabelText("select-row-codex:alpha-id")).toBeInTheDocument();
   expect(screen.getByLabelText("select-row-codex:beta-id")).toBeInTheDocument();
-  expect(screen.getByRole("columnheader", { name: "创建时间" })).toBeInTheDocument();
+  expect(screen.queryByRole("columnheader", { name: "创建时间" })).not.toBeInTheDocument();
   expect(screen.getByRole("columnheader", { name: "更新时间" })).toBeInTheDocument();
-  expect(screen.getAllByText("2026-04-21T09:00:00Z").length).toBeGreaterThan(0);
-  expect(screen.getAllByText("2026-04-21T10:00:00Z").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("2026-04-21 18:00").length).toBeGreaterThan(0);
+  expect(screen.getAllByTitle("2026-04-21T10:00:00Z").length).toBeGreaterThan(0);
   const refreshIndex = invokeMock.mock.calls.findIndex((call) => call[0] === "refresh_sessions");
   const listIndex = invokeMock.mock.calls.findIndex((call) => call[0] === "list_sessions");
   expect(refreshIndex).toBeGreaterThanOrEqual(0);
   expect(listIndex).toBeGreaterThanOrEqual(0);
+});
+
+it("keeps bulk deletion out of the toolbar until a session is selected", async () => {
+  render(<AppShell />);
+
+  await expandAllGroups();
+  expect(screen.queryByLabelText("batch-delete-sessions")).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByLabelText("select-row-codex:alpha-id"));
+  expect(screen.getByLabelText("batch-delete-sessions")).toHaveTextContent("批量删除 (1)");
 });
 
 it("startup keeps runtime -> settings before refresh, overview, and list", async () => {
@@ -1626,7 +1636,7 @@ it("deletes from inspector with hardDelete enabled when switch is on", async () 
   });
 });
 
-it("shows loading mask while session detail is fetching", async () => {
+it("shows an in-panel skeleton while session detail is fetching", async () => {
   const detailDeferred = createDeferred<{ detail: { sourceTool: string; sourceId: string; title: string; workspacePath: string; sourcePath: string; createdAt: string; updatedAt: string; messages: Array<{ role: string; content: string; createdAt: string }> } }>();
 
   invokeMock.mockImplementation(async (cmd: string, args?: { payload?: { sourceTool?: string; sourceId?: string; includeSubagent?: boolean; messageLimit?: number } }) => {
@@ -1655,7 +1665,8 @@ it("shows loading mask while session detail is fetching", async () => {
   render(<AppShell />);
   await expandAllGroups();
   fireEvent.click(await screen.findByText("真实会话 Alpha：排查 S3 签名失效"));
-  expect(await screen.findByTestId("inspector-loading-mask")).toBeInTheDocument();
+  expect(await screen.findByTestId("inspector-detail-skeleton")).toBeInTheDocument();
+  expect(screen.queryByText("未选择会话")).not.toBeInTheDocument();
 
   detailDeferred.resolve({
     detail: {
@@ -1671,7 +1682,7 @@ it("shows loading mask while session detail is fetching", async () => {
   });
 
   await waitFor(() => {
-    expect(screen.queryByTestId("inspector-loading-mask")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("inspector-detail-skeleton")).not.toBeInTheDocument();
   });
 });
 
@@ -2763,7 +2774,7 @@ it("shows confirm modal before batch hard delete in trash mode", async () => {
 it("uses the shared danger action style for toolbar and trash delete actions", async () => {
   render(<AppShell />);
 
-  expect(screen.getByLabelText("batch-delete-sessions")).toHaveClass("btn-danger-solid");
+  expect(screen.queryByLabelText("batch-delete-sessions")).not.toBeInTheDocument();
 
   fireEvent.click(await screen.findByLabelText("switch-trash"));
   await waitFor(() => {

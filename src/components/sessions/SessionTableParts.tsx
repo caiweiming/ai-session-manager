@@ -8,9 +8,14 @@ import type {
 } from "./sessionTableTypes";
 import {
   formatSizeForDisplay,
+  formatRelativeTimestampForDisplay,
   formatTimestampForDisplay,
   renderHighlightedText,
 } from "./sessionTableUtils";
+
+const TableTimestamp = ({ value }: { value: string }) => (
+  <span title={formatTimestampForDisplay(value)}>{formatRelativeTimestampForDisplay(value)}</span>
+);
 
 const SessionTableCheckbox = ({
   ariaLabel,
@@ -127,7 +132,7 @@ export const SessionTableHeader = ({
   onToggleAll: (checked: boolean) => void;
 }) => (
     <div className="session-table-header session-table-grid" role="row">
-      <div className="session-table-cell col-checkbox" role="columnheader">
+    <div className="session-table-cell col-checkbox" role="columnheader">
         <SessionTableCheckbox
           ariaLabel="select-all-sessions"
           checked={allSelected}
@@ -136,7 +141,7 @@ export const SessionTableHeader = ({
     </div>
     <div className="session-table-cell col-tool" role="columnheader">工具</div>
     <div className="session-table-cell" role="columnheader">目录路径 / 会话记录</div>
-    <div className="session-table-cell col-time" role="columnheader">创建时间</div>
+    <div className="session-table-cell col-summary" role="columnheader">会话 / 占用</div>
     <div className="session-table-cell col-time" role="columnheader">更新时间</div>
     <div className="session-table-cell col-action" role="columnheader">操作</div>
   </div>
@@ -164,7 +169,7 @@ export const SessionTableStickyGroupRow = ({
     >
       <div className="session-table-cell col-checkbox" role="cell" />
       <div className="session-table-cell col-tool" role="cell">
-        <span className={`tag ${group.toolClass}`} title={group.toolLabel}>
+        <span className={`tag table-tool-tag ${group.toolClass}${isMultiSourceGroup ? " multi-source-tool-tag" : ""}`} title={group.toolLabel}>
           {isMultiSourceGroup ? <MultiSourceLogo /> : null}
           {!isMultiSourceGroup && groupLogoSrc ? (
             <img
@@ -207,18 +212,17 @@ export const SessionTableStickyGroupRow = ({
               </svg>
             </button>
           </div>
-          <span className="session-count">
-            {group.rows.length} 个会话 · {formatSizeForDisplay(group.totalSizeBytes)}
-          </span>
         </div>
       </div>
-      <div className="session-table-cell time-cell sticky-group-time" role="cell">
-        {formatTimestampForDisplay(group.createdAt)}
+      <div className="session-table-cell col-summary" role="cell">
+        <span className="session-count">
+          {group.rows.length} 个会话 · {formatSizeForDisplay(group.totalSizeBytes)}
+        </span>
       </div>
-      <div className="session-table-cell time-cell sticky-group-time" role="cell">
-        {formatTimestampForDisplay(group.updatedAt)}
+      <div className="session-table-cell col-time time-cell sticky-group-time" role="cell">
+        <TableTimestamp value={group.updatedAt} />
       </div>
-      <div className="session-table-cell" role="cell">
+      <div className="session-table-cell col-action" role="cell">
         <span className="session-kind-chip main sticky-group-chip">目录</span>
       </div>
     </div>
@@ -251,7 +255,7 @@ export const SessionTableGroupRow = ({
 
   return (
     <div
-      className={`group-header session-table-row session-table-grid session-virtual-row${hiddenForSticky ? " sticky-source-hidden" : ""}`}
+      className={`group-header session-table-row session-table-grid session-virtual-row${groupSelected ? " checked" : ""}${expanded ? " expanded" : ""}${hiddenForSticky ? " sticky-source-hidden" : ""}`}
       role="row"
     >
       <div className="session-table-cell col-checkbox" role="cell">
@@ -263,7 +267,7 @@ export const SessionTableGroupRow = ({
         />
       </div>
       <div className="session-table-cell" role="cell">
-        <span className={`tag ${group.toolClass}`} title={group.toolLabel}>
+        <span className={`tag table-tool-tag ${group.toolClass}${isMultiSourceGroup ? " multi-source-tool-tag" : ""}`} title={group.toolLabel}>
           {isMultiSourceGroup ? <MultiSourceLogo /> : null}
           {!isMultiSourceGroup && groupLogoSrc ? (
             <img
@@ -305,14 +309,15 @@ export const SessionTableGroupRow = ({
               </svg>
             </button>
           </div>
-          <span className="session-count">
-            {group.rows.length} 个会话 · {formatSizeForDisplay(group.totalSizeBytes)}
-          </span>
         </div>
       </div>
-      <div className="session-table-cell time-cell" role="cell">{formatTimestampForDisplay(group.createdAt)}</div>
-      <div className="session-table-cell time-cell" role="cell">{formatTimestampForDisplay(group.updatedAt)}</div>
-      <div className="session-table-cell" role="cell" />
+      <div className="session-table-cell col-summary" role="cell">
+        <span className="session-count">
+          {group.rows.length} 个会话 · {formatSizeForDisplay(group.totalSizeBytes)}
+        </span>
+      </div>
+      <div className="session-table-cell col-time time-cell" role="cell"><TableTimestamp value={group.updatedAt} /></div>
+      <div className="session-table-cell col-action" role="cell" />
     </div>
   );
 };
@@ -362,8 +367,8 @@ export const SessionTableDataRow = ({
           onChange={onToggle}
         />
       </div>
-      <div className="session-table-cell" role="cell">
-        <span className={`tag ${row.toolClass}`} title={row.toolLabel}>
+      <div className="session-table-cell col-tool" role="cell">
+        <span className={`tag table-tool-tag ${row.toolClass}`} title={row.toolLabel}>
           {rowLogoSrc ? (
             <img
               className={`tool-logo${row.toolClass === "codex" ? " codex-logo" : ""}`}
@@ -383,15 +388,15 @@ export const SessionTableDataRow = ({
           >
             {renderHighlightedText(row.title, highlightKeyword)}
           </button>
-          <span className={`session-kind-chip ${row.isSubagent ? "subagent" : "main"}`}>
-            {row.isSubagent ? "子代理" : "主会话"}
-          </span>
-          <span className="session-size-value">{formatSizeForDisplay(row.sizeBytes)}</span>
         </div>
       </div>
-      <div className="session-table-cell time-cell" role="cell">{formatTimestampForDisplay(row.createdAt)}</div>
-      <div className="session-table-cell time-cell" role="cell">{formatTimestampForDisplay(row.updatedAt)}</div>
-      <div className="session-table-cell" role="cell">
+      <div className="session-table-cell col-summary" role="cell">
+        <span className="session-meta-text">
+          {row.isSubagent ? "子代理" : "主会话"} · {formatSizeForDisplay(row.sizeBytes)}
+        </span>
+      </div>
+      <div className="session-table-cell col-time time-cell" role="cell"><TableTimestamp value={row.updatedAt} /></div>
+      <div className="session-table-cell col-action" role="cell">
         <div className={`row-actions${resumeState !== "idle" ? " has-feedback" : ""}`}>
           {viewMode === "trash" ? (
             <SessionActionButton

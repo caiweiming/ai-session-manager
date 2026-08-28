@@ -20,7 +20,6 @@ export function useInspectorPanelController({
   detail,
   subagentRows,
   subagentsLoading,
-  defaultHardDelete,
   handleDeleteSession,
   handleExportSession,
   handleResumeSession,
@@ -28,7 +27,6 @@ export function useInspectorPanelController({
   detail: SessionDetail | null;
   subagentRows: SubagentSessionRow[];
   subagentsLoading: boolean;
-  defaultHardDelete: boolean;
   handleDeleteSession: Pick<
     ReturnType<typeof useSessionMutationController>,
     "handleDeleteSession"
@@ -49,8 +47,6 @@ export function useInspectorPanelController({
   const [toast, setToast] = useState<InspectorToast>(null);
   const [resumeCopied, setResumeCopied] = useState(false);
   const [resumeState, setResumeState] = useState<InspectorResumeState>("idle");
-  const [hardDelete, setHardDelete] = useState(false);
-  const [hardDeleteConfirmOpen, setHardDeleteConfirmOpen] = useState(false);
   const [actionBusy, setActionBusy] = useState<InspectorActionBusy>(null);
   const [selectedSubagentId, setSelectedSubagentId] = useState<string | null>(
     null,
@@ -67,13 +63,11 @@ export function useInspectorPanelController({
     setToast(null);
     setResumeCopied(false);
     setResumeState("idle");
-    setHardDelete(defaultHardDelete);
-    setHardDeleteConfirmOpen(false);
     setActionBusy(null);
     setSelectedSubagentId(null);
     setSelectedSubagentDetail(null);
     setSelectedSubagentLoading(false);
-  }, [defaultHardDelete, detail?.sourceTool, detail?.sourceId]);
+  }, [detail?.sourceTool, detail?.sourceId]);
 
   useEffect(() => {
     if (!toast) return;
@@ -279,7 +273,7 @@ export function useInspectorPanelController({
     setActionBusy("delete");
     try {
       const result = await handleDeleteSession(detail.sourceTool, detail.sourceId, {
-        hardDelete,
+        hardDelete: false,
         cascadeSubagents: true,
       });
       if (result === false) {
@@ -294,15 +288,6 @@ export function useInspectorPanelController({
 
   const handleDeleteAction = () => {
     if (!detail || actionBusy !== null) return;
-    if (hardDelete) {
-      setHardDeleteConfirmOpen(true);
-      return;
-    }
-    void deleteCurrentSession();
-  };
-
-  const confirmHardDelete = () => {
-    setHardDeleteConfirmOpen(false);
     void deleteCurrentSession();
   };
 
@@ -313,13 +298,10 @@ export function useInspectorPanelController({
     toast,
     resumeCopied,
     resumeState,
-    hardDelete,
-    hardDeleteConfirmOpen,
     actionBusy,
     selectedSubagentId,
     selectedSubagentDetail,
     selectedSubagentLoading,
-    setHardDelete,
     setSelectedSubagentId,
     openSubagentSummary,
     closeSubagentSummary,
@@ -331,7 +313,5 @@ export function useInspectorPanelController({
     resumeSessionFromInspector,
     exportSessionAsMarkdown,
     handleDeleteAction,
-    closeHardDeleteConfirm: () => setHardDeleteConfirmOpen(false),
-    confirmHardDelete,
   };
 }

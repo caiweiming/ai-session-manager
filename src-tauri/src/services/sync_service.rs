@@ -212,6 +212,7 @@ fn is_instruction_like_stored_title(title: &str) -> bool {
     lower.contains("<permissions instructions>")
         || lower.contains("filesystem sandboxing")
         || lower.starts_with("# agents.md instructions")
+        || (lower.starts_with("<image ") && lower.contains("path="))
 }
 
 fn mark_removed_sessions(

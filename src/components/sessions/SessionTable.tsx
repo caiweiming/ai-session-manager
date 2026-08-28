@@ -1,4 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import type {
   NormalizedSessionRow,
   SessionSortMode,
@@ -70,6 +71,7 @@ export function SessionTable({
   const [internalActiveSessionId, setInternalActiveSessionId] = useState<string | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(360);
+  const [scrollbarGutter, setScrollbarGutter] = useState(0);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
 
   const normalizedRows = useMemo<NormalizedSessionRow[]>(
@@ -128,21 +130,22 @@ export function SessionTable({
     const element = scrollViewportRef.current;
     if (!element) return;
 
-    const syncHeight = () => {
+    const syncViewportMetrics = () => {
       setViewportHeight(element.clientHeight || 360);
+      setScrollbarGutter(Math.max(0, element.offsetWidth - element.clientWidth));
     };
 
-    syncHeight();
+    syncViewportMetrics();
     const resizeObserver = typeof ResizeObserver === "undefined"
       ? null
       : new ResizeObserver(() => {
-          syncHeight();
+          syncViewportMetrics();
         });
     resizeObserver?.observe(element);
-    window.addEventListener("resize", syncHeight);
+    window.addEventListener("resize", syncViewportMetrics);
     return () => {
       resizeObserver?.disconnect();
-      window.removeEventListener("resize", syncHeight);
+      window.removeEventListener("resize", syncViewportMetrics);
     };
   }, [hasRows]);
 
@@ -293,7 +296,12 @@ export function SessionTable({
           <span>暂无会话数据</span>
         </div>
       ) : (
-        <div className="session-table" role="table" aria-label="session-table">
+        <div
+          className="session-table"
+          role="table"
+          aria-label="session-table"
+          style={{ "--session-table-scrollbar-gutter": `${scrollbarGutter}px` } as CSSProperties}
+        >
           <SessionTableHeader
             allSelected={allSelected}
             onToggleAll={toggleAll}
@@ -317,7 +325,7 @@ export function SessionTable({
               className="session-table-spacer"
               style={{
                 height: `${windowState.totalHeight}px`,
-                paddingTop: stickyGroup ? "50px" : undefined,
+                paddingTop: stickyGroup ? "44px" : undefined,
               }}
             >
               <div

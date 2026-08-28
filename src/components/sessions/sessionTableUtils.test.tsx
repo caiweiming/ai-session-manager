@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildGroups, normalizeSessionTableRows, normalizeGroupPath } from "./sessionTableUtils";
+import {
+  buildGroups,
+  formatRelativeTimestampForDisplay,
+  normalizeSessionTableRows,
+  normalizeGroupPath,
+} from "./sessionTableUtils";
 import type { SessionTableRow } from "./sessionTableTypes";
 
 describe("sessionTableUtils", () => {
@@ -26,7 +31,7 @@ describe("sessionTableUtils", () => {
     });
   });
 
-  it("groups windows path variants into one multi-source group and appends missing hints", () => {
+  it("groups windows path variants without rendering empty project hints", () => {
     const rows = normalizeSessionTableRows([
       {
         id: "1",
@@ -45,15 +50,12 @@ describe("sessionTableUtils", () => {
     ]);
 
     const groups = buildGroups(rows, ["D:\\Works\\missing-project"]);
-    expect(groups).toHaveLength(2);
+    expect(groups).toHaveLength(1);
     expect(groups[0]).toMatchObject({
       displayPath: "D:\\Works\\pojie",
       toolLabel: "多来源",
     });
     expect(groups[0]?.rows).toHaveLength(2);
-    expect(groups[1]).toMatchObject({
-      displayPath: "D:\\Works\\missing-project",
-    });
   });
 
   it("normalizes empty paths to unknown group", () => {
@@ -61,5 +63,14 @@ describe("sessionTableUtils", () => {
       key: "unknown-path",
       display: "未知路径",
     });
+  });
+
+  it("formats table update timestamps with date and minute precision", () => {
+    const now = new Date(2026, 7, 25, 16, 30, 0);
+
+    expect(formatRelativeTimestampForDisplay("2026-08-25 09:12:43", now)).toBe("2026-08-25 09:12");
+    expect(formatRelativeTimestampForDisplay("2026-08-24 18:05:00", now)).toBe("2026-08-24 18:05");
+    expect(formatRelativeTimestampForDisplay("2026-08-20 08:30:00", now)).toBe("2026-08-20 08:30");
+    expect(formatRelativeTimestampForDisplay("未知时间", now)).toBe("未知时间");
   });
 });

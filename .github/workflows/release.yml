@@ -26,6 +26,12 @@ jobs:
             artifact-name: release-assets-linux
 
     runs-on: ${{ matrix.os }}
+    env:
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
     steps:
       - uses: actions/checkout@v4
@@ -51,7 +57,44 @@ jobs:
 
       - run: node --test scripts/release-assets.test.mjs
 
+      - name: Detect macOS signing mode
+        if: matrix.os == 'macos-latest'
+        run: |
+          if [ -n "$APPLE_CERTIFICATE" ] && [ -n "$APPLE_CERTIFICATE_PASSWORD" ] && [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            echo "MACOS_SIGNING_ENABLED=true" >> "$GITHUB_ENV"
+          else
+            echo "MACOS_SIGNING_ENABLED=false" >> "$GITHUB_ENV"
+            echo "::warning::No Apple signing secrets found; building unsigned macOS artifact. Users must manually approve it in Gatekeeper."
+          fi
+
+      - name: Import Apple Developer ID certificate
+        if: matrix.os == 'macos-latest' && env.MACOS_SIGNING_ENABLED == 'true'
+        env:
+          KEYCHAIN_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          CERTIFICATE_PATH="$RUNNER_TEMP/developer-id.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed 's/[ "]//g')
+
+          identity="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p' | head -n 1)"
+          if [ -z "$identity" ]; then
+            echo "::error::No Developer ID Application signing identity found in APPLE_CERTIFICATE"
+            exit 1
+          fi
+          echo "APPLE_SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
+
       - run: pnpm run ${{ matrix.script }}
+
+      - name: Verify macOS Gatekeeper acceptance
+        if: matrix.os == 'macos-latest' && env.MACOS_SIGNING_ENABLED == 'true'
+        run: spctl -a -t open --context context:primary-signature -vv release-assets/*macos*.dmg
 
       - uses: actions/upload-artifact@v4
         with:

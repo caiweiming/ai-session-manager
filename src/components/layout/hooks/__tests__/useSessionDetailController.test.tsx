@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { flushSync } from "react-dom";
 import { beforeEach, expect, it } from "vitest";
 import { invokeMock } from "../../../../test/mockTauriInvoke";
 import type { SessionTableRow } from "../../../sessions/SessionTable";
@@ -101,7 +102,30 @@ it("selects session and requests detail plus subagents with current view scope a
   });
 });
 
-it("loads more messages by increasing limit to 320 and refetching detail", async () => {
+it("keeps the current detail visible while loading the next conversation batch", async () => {
+  let resolveNextDetail: ((value: unknown) => void) | undefined;
+  const nextDetail = new Promise((resolve) => {
+    resolveNextDetail = resolve;
+  });
+  let detailCallCount = 0;
+  invokeMock.mockImplementation(async (cmd: string, args?: { payload?: Record<string, unknown> }) => {
+    if (cmd !== "get_session_detail") return { rows: [] };
+    detailCallCount += 1;
+    if (detailCallCount === 2) return nextDetail;
+    return {
+      detail: {
+        sourceTool: args?.payload?.sourceTool ?? "codex",
+        sourceId: args?.payload?.sourceId ?? "alpha-id",
+        title: "保持可见的会话",
+        workspacePath: "D:\\Works\\alpha",
+        sourcePath: "D:\\Works\\alpha\\alpha.jsonl",
+        updatedAt: "2026-05-01T09:00:00Z",
+        messageLoaded: 120,
+        messageTotal: 240,
+        messages: [],
+      },
+    };
+  });
   const { result } = renderHook(
     (props: { rows: SessionRow[]; viewMode: "overview" | "trash" }) => useSessionDetailController(props),
     {
@@ -139,9 +163,163 @@ it("loads more messages by increasing limit to 320 and refetching detail", async
         sourceId: "alpha-id",
         includeSubagent: false,
         inTrash: false,
-        messageLimit: 320,
+        messageLimit: 200,
       },
     });
+  });
+  expect(result.current.detail?.title).toBe("保持可见的会话");
+  expect(result.current.detailLoading).toBe(true);
+
+  await act(async () => {
+    resolveNextDetail?.({
+      detail: {
+        sourceTool: "codex",
+        sourceId: "alpha-id",
+        title: "保持可见的会话",
+        workspacePath: "D:\\Works\\alpha",
+        sourcePath: "D:\\Works\\alpha\\alpha.jsonl",
+        updatedAt: "2026-05-01T09:00:00Z",
+        messageLoaded: 200,
+        messageTotal: 240,
+        messages: [],
+      },
+    });
+  });
+});
+
+it("shows cached detail immediately while revalidating a reopened session", async () => {
+  let detailCallCount = 0;
+  let resolveSecondDetail: ((value: unknown) => void) | undefined;
+  const secondDetail = new Promise((resolve) => {
+    resolveSecondDetail = resolve;
+  });
+
+  invokeMock.mockImplementation(async (cmd: string, args?: { payload?: Record<string, unknown> }) => {
+    if (cmd === "get_session_detail") {
+      detailCallCount += 1;
+      if (detailCallCount === 2) {
+        return secondDetail;
+      }
+      return {
+        detail: {
+          sourceTool: args?.payload?.sourceTool ?? "codex",
+          sourceId: args?.payload?.sourceId ?? "alpha-id",
+          title: "缓存中的会话",
+          workspacePath: "D:\\Works\\alpha",
+          sourcePath: "D:\\Works\\alpha\\alpha.jsonl",
+          createdAt: "2026-05-01T08:00:00Z",
+          updatedAt: "2026-05-01T09:00:00Z",
+          messages: [],
+        },
+      };
+    }
+    return { rows: [] };
+  });
+
+  const { result } = renderHook(
+    (props: { rows: SessionRow[]; viewMode: "overview" | "trash" }) => useSessionDetailController(props),
+    {
+      initialProps: {
+        rows: baseRows,
+        viewMode: "overview",
+      },
+    },
+  );
+
+  act(() => {
+    result.current.handleSessionSelection("codex:alpha-id");
+  });
+  await waitFor(() => {
+    expect(result.current.detail?.title).toBe("缓存中的会话");
+  });
+
+  act(() => {
+    result.current.handleSessionSelection("codex:alpha-id");
+  });
+  act(() => {
+    result.current.handleSessionSelection("codex:alpha-id");
+  });
+
+  await waitFor(() => {
+    expect(result.current.detail?.title).toBe("缓存中的会话");
+    expect(result.current.detailLoading).toBe(true);
+  });
+  expect(detailCallCount).toBe(2);
+
+  resolveSecondDetail?.({
+    detail: {
+      sourceTool: "codex",
+      sourceId: "alpha-id",
+      title: "后台校验后的会话",
+      workspacePath: "D:\\Works\\alpha",
+      sourcePath: "D:\\Works\\alpha\\alpha.jsonl",
+      createdAt: "2026-05-01T08:00:00Z",
+      updatedAt: "2026-05-01T10:00:00Z",
+      messages: [],
+    },
+  });
+
+  await waitFor(() => {
+    expect(result.current.detail?.title).toBe("后台校验后的会话");
+    expect(result.current.detailLoading).toBe(false);
+  });
+});
+
+it("restores the previous session detail in the same render when switching back", async () => {
+  invokeMock.mockImplementation(async (cmd: string, args?: { payload?: Record<string, unknown> }) => {
+    if (cmd === "get_session_detail") {
+      const sourceId = args?.payload?.sourceId ?? "alpha-id";
+      return {
+        detail: {
+          sourceTool: args?.payload?.sourceTool ?? "codex",
+          sourceId,
+          title: `${sourceId} 详情`,
+          workspacePath: "D:\\Works\\alpha",
+          sourcePath: `D:\\Works\\alpha\\${sourceId}.jsonl`,
+          createdAt: "2026-05-01T08:00:00Z",
+          updatedAt: "2026-05-01T09:00:00Z",
+          messages: [],
+        },
+      };
+    }
+    return { rows: [] };
+  });
+
+  const { result } = renderHook(
+    (props: { rows: SessionRow[]; viewMode: "overview" | "trash" }) => useSessionDetailController(props),
+    {
+      initialProps: {
+        rows: baseRows,
+        viewMode: "overview",
+      },
+    },
+  );
+
+  act(() => {
+    result.current.handleSessionSelection("codex:alpha-id");
+  });
+  await waitFor(() => {
+    expect(result.current.detail?.title).toBe("alpha-id 详情");
+  });
+
+  act(() => {
+    result.current.handleSessionSelection("codex:sub-id");
+  });
+  await waitFor(() => {
+    expect(result.current.detail?.title).toBe("sub-id 详情");
+  });
+
+  act(() => {
+    flushSync(() => {
+      result.current.handleSessionSelection("codex:alpha-id");
+    });
+  });
+
+  expect(result.current.activeSessionId).toBe("codex:alpha-id");
+  expect(result.current.detail?.title).toBe("alpha-id 详情");
+
+  await act(async () => {
+    await Promise.resolve();
   });
 });
 

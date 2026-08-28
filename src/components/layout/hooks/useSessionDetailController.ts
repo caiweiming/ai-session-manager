@@ -10,7 +10,11 @@ type UseSessionDetailControllerProps = {
 };
 
 const DEFAULT_DETAIL_MESSAGE_LIMIT = 120;
-const DETAIL_MESSAGE_LOAD_STEP = 200;
+const DETAIL_MESSAGE_LOAD_STEP = 80;
+const DETAIL_CACHE_MAX_ENTRIES = 12;
+
+const buildDetailCacheKey = (viewMode: SessionViewMode, sourceTool: string, sourceId: string, messageLimit: number) =>
+  `${viewMode}:${sourceTool}:${sourceId}:${messageLimit}`;
 
 export function useSessionDetailController({ rows, viewMode }: UseSessionDetailControllerProps) {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -20,6 +24,7 @@ export function useSessionDetailController({ rows, viewMode }: UseSessionDetailC
   const [subagentsLoading, setSubagentsLoading] = useState(false);
   const [detailMessageLimit, setDetailMessageLimit] = useState<number>(DEFAULT_DETAIL_MESSAGE_LIMIT);
   const detailRequestSeqRef = useRef(0);
+  const detailCacheRef = useRef(new Map<string, SessionDetail>());
 
   const resetDetailState = useCallback(() => {
     setActiveSessionId(null);
@@ -67,13 +72,19 @@ export function useSessionDetailController({ rows, viewMode }: UseSessionDetailC
       };
     }
 
-    setDetail(null);
-    setDetailLoading(true);
-    setSubagentRows([]);
-    setSubagentsLoading(true);
     const sourceTool = activeRow.sourceTool;
     const sourceId = activeRow.sourceId;
     const includeSubagent = activeRow.isSubagent === true;
+    const detailCacheKey = buildDetailCacheKey(viewMode, sourceTool, sourceId, detailMessageLimit);
+    const cachedDetail = detailCacheRef.current.get(detailCacheKey)
+      ?? Array.from(detailCacheRef.current.entries())
+        .find(([key]) => key.startsWith(`${viewMode}:${sourceTool}:${sourceId}:`))?.[1]
+      ?? null;
+
+    setDetail(cachedDetail);
+    setDetailLoading(true);
+    setSubagentRows([]);
+    setSubagentsLoading(true);
 
     const fetchSessionDetail = async () => {
       try {
@@ -85,11 +96,20 @@ export function useSessionDetailController({ rows, viewMode }: UseSessionDetailC
           messageLimit: detailMessageLimit,
         });
         if (!cancelled && requestSeq === detailRequestSeqRef.current) {
+          if (result.detail) {
+            detailCacheRef.current.delete(detailCacheKey);
+            detailCacheRef.current.set(detailCacheKey, result.detail);
+            while (detailCacheRef.current.size > DETAIL_CACHE_MAX_ENTRIES) {
+              const oldestKey = detailCacheRef.current.keys().next().value;
+              if (!oldestKey) break;
+              detailCacheRef.current.delete(oldestKey);
+            }
+          }
           setDetail(result.detail);
         }
       } catch {
         if (!cancelled && requestSeq === detailRequestSeqRef.current) {
-          setDetail(null);
+          setDetail(cachedDetail);
         }
       } finally {
         if (!cancelled && requestSeq === detailRequestSeqRef.current) {
@@ -144,10 +164,21 @@ export function useSessionDetailController({ rows, viewMode }: UseSessionDetailC
         resetDetailState();
         return;
       }
+      const nextRow = rows.find((row) => row.id === id);
+      const cachedDetail = nextRow?.sourceTool && nextRow.sourceId
+        ? detailCacheRef.current.get(
+          buildDetailCacheKey(viewMode, nextRow.sourceTool, nextRow.sourceId, DEFAULT_DETAIL_MESSAGE_LIMIT),
+        ) ?? null
+        : null;
+
+      setDetail(cachedDetail);
+      setDetailLoading(Boolean(nextRow));
+      setSubagentRows([]);
+      setSubagentsLoading(Boolean(nextRow && !nextRow.isSubagent));
       setDetailMessageLimit(DEFAULT_DETAIL_MESSAGE_LIMIT);
       setActiveSessionId(id);
     },
-    [activeSessionId, resetDetailState],
+    [activeSessionId, resetDetailState, rows, viewMode],
   );
 
   const handleLoadMoreMessages = useCallback(() => {

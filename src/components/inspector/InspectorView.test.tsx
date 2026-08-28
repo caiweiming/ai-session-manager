@@ -42,6 +42,28 @@ it("maps assistant role to ai style", () => {
   expect(screen.getByText("2026-04-24 16:20:00")).toBeInTheDocument();
 });
 
+it("renders assistant messages as GitHub-flavored Markdown", () => {
+  render(
+    <InspectorView
+      open={true}
+      onClose={() => {}}
+      messages={[
+        {
+          role: "assistant",
+          content: "## 扫描结论\n\n这是 **重点**，可见 [详情](https://example.com)。\n\n- 第一项\n- 第二项\n\n```ts\nconst ready = true;\n```",
+          createdAt: "2026-04-24 16:20:00",
+        },
+      ]}
+    />,
+  );
+
+  expect(screen.getByRole("heading", { name: "扫描结论" })).toBeInTheDocument();
+  expect(screen.getByText("重点").tagName).toBe("STRONG");
+  expect(screen.getByRole("link", { name: "详情" })).toHaveAttribute("href", "https://example.com");
+  expect(screen.getByRole("list")).toHaveTextContent("第一项");
+  expect(screen.getByText("const ready = true;")).toBeInTheDocument();
+});
+
 it("copies message content when clicking bubble copy button", async () => {
   const writeText = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(navigator, "clipboard", {

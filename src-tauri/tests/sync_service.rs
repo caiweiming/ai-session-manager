@@ -324,7 +324,7 @@ fn refresh_codex_sessions_should_prune_removed_files_and_restore_when_file_retur
 }
 
 #[test]
-fn refresh_codex_sessions_should_rebuild_instruction_like_title_even_when_file_unchanged() {
+fn refresh_codex_sessions_should_rebuild_invalid_title_even_when_file_unchanged() {
     let temp = tempdir().unwrap();
     let db_path = temp.path().join("test.db");
     init_db(&db_path).unwrap();
@@ -345,9 +345,9 @@ fn refresh_codex_sessions_should_rebuild_instruction_like_title_even_when_file_u
 
     let conn = Connection::open(&db_path).unwrap();
     conn.execute(
-        "update sessions
-         set title='<permissions instructions> Filesystem sandboxing...'
-         where source_tool='codex' and source_id='session_fix_title'",
+        r#"update sessions
+         set title='<image name=[Image #1] path="/tmp/screenshot.png">'
+         where source_tool='codex' and source_id='session_fix_title'"#,
         [],
     )
     .unwrap();

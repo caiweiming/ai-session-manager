@@ -124,6 +124,31 @@ test("release workflow installs both Rust targets required for universal macOS b
   assert.match(workflow, /rustup target add aarch64-apple-darwin x86_64-apple-darwin/);
 });
 
+test("release workflow optionally signs and verifies macOS release assets", async () => {
+  const workflow = await readFile(path.join(repoRoot, ".github", "workflows", "release.yml"), "utf8");
+
+  assert.match(workflow, /APPLE_SIGNING_IDENTITY/);
+  assert.match(workflow, /APPLE_CERTIFICATE/);
+  assert.match(workflow, /APPLE_CERTIFICATE_PASSWORD/);
+  assert.match(workflow, /APPLE_ID/);
+  assert.match(workflow, /APPLE_PASSWORD/);
+  assert.match(workflow, /APPLE_TEAM_ID/);
+  assert.match(workflow, /MACOS_SIGNING_ENABLED=true/);
+  assert.match(workflow, /No Apple signing secrets found; building unsigned macOS artifact/);
+  assert.doesNotMatch(workflow, /Missing required GitHub secret/);
+  assert.match(workflow, /spctl -a -t open --context context:primary-signature -vv release-assets\/\*macos\*\.dmg/);
+});
+
+test("README documents how to open unsigned macOS builds", async () => {
+  const readme = await readFile(path.join(repoRoot, "README.md"), "utf8");
+
+  assert.match(readme, /未签名 macOS 版本打开方式/);
+  assert.match(readme, /按住 `Control`/);
+  assert.match(readme, /隐私与安全性/);
+  assert.match(readme, /xattr -dr com\.apple\.quarantine/);
+  assert.match(readme, /未签名版本只建议在确认下载来源可信时使用/);
+});
+
 test("release workflow builds Linux release assets on Ubuntu", async () => {
   const workflow = await readFile(path.join(repoRoot, ".github", "workflows", "release.yml"), "utf8");
 

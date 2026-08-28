@@ -127,7 +127,7 @@ it("uses matching labels for settings navigation and section headings", () => {
     />,
   );
 
-  for (const label of ["扫描规则", "外观主题", "恢复终端", "删除行为", "关于"]) {
+  for (const label of ["扫描规则", "外观主题", "恢复终端", "删除行为", "关于应用"]) {
     expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: label })).toBeInTheDocument();
   }
@@ -411,7 +411,7 @@ it("keeps clicked navigation item active while smooth scrolling to about section
     toJSON: () => {},
   }));
 
-  const aboutNav = screen.getByRole("button", { name: "关于" });
+  const aboutNav = screen.getByRole("button", { name: "关于应用" });
   fireEvent.click(aboutNav);
   fireEvent.scroll(content);
 
@@ -485,8 +485,8 @@ it("shows about information with current version and release links", () => {
     />,
   );
 
-  expect(screen.getByRole("button", { name: "关于" })).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "关于" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "关于应用" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "关于应用" })).toBeInTheDocument();
   expect(screen.getByText("版本 0.1.1")).toBeInTheDocument();
   expect(screen.getByText("用于本地汇总、检索和恢复 AI 工具会话记录。")).toBeInTheDocument();
   expect(screen.getByLabelText("关于操作").textContent).toBe("检查更新GitHub 发布页Gitee 发布页");

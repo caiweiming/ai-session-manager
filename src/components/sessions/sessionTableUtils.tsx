@@ -25,6 +25,15 @@ export const formatTimestampForDisplay = (value: string) => {
   return trimmed;
 };
 
+export const formatRelativeTimestampForDisplay = (value: string, now = new Date()) => {
+  const displayValue = formatTimestampForDisplay(value);
+  const parsed = new Date(value.replace(" ", "T"));
+  if (Number.isNaN(parsed.getTime())) return displayValue;
+  void now;
+  const time = `${String(parsed.getHours()).padStart(2, "0")}:${String(parsed.getMinutes()).padStart(2, "0")}`;
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")} ${time}`;
+};
+
 export const formatSizeForDisplay = (sizeBytes: number | null) => {
   if (sizeBytes === null || !Number.isFinite(sizeBytes) || sizeBytes < 0) return "--";
   if (sizeBytes < 1024) return `${Math.round(sizeBytes)} B`;
@@ -123,13 +132,9 @@ export const buildGroups = (rows: NormalizedSessionRow[], groupPathHints: string
     grouped.set(normalized.key, { displayPath: normalized.display, rows: [row] });
   }
 
-  for (const hintPath of groupPathHints) {
-    const normalized = normalizeGroupPath(hintPath);
-    if (!normalized.display || grouped.has(normalized.key)) {
-      continue;
-    }
-    grouped.set(normalized.key, { displayPath: normalized.display, rows: [] });
-  }
+  // Claude project hints describe discovered workspaces, not actionable sessions.
+  // Empty hints stay out of the session table until an actual record is indexed.
+  void groupPathHints;
 
   return Array.from(grouped.entries()).map(([groupKey, groupMeta]) => {
     const groupRows = groupMeta.rows;

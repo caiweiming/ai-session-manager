@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState, type ReactNode } from "react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const copyPlainText = async (text: string) => {
   if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
@@ -24,6 +26,24 @@ const copyPlainText = async (text: string) => {
     throw new Error("clipboard unavailable");
   }
 };
+
+const markdownComponents = {
+  a: ({ href, children, ...props }: { href?: string; children?: ReactNode }) => (
+    <a href={href} target="_blank" rel="noreferrer" {...props}>
+      {children}
+    </a>
+  ),
+};
+
+const MessageContent = memo(function MessageContent({ content }: { content: string }) {
+  return (
+    <div className="chat-content">
+      <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+        {content}
+      </Markdown>
+    </div>
+  );
+});
 
 export function InspectorView({
   open,
@@ -106,14 +126,14 @@ export function InspectorView({
     return () => window.clearTimeout(timer);
   }, [copiedIndex]);
 
-  const handleCopyMessage = async (content: string, index: number) => {
+  const handleCopyMessage = useCallback(async (content: string, index: number) => {
     setCopiedIndex(index);
     try {
       await copyPlainText(content);
     } catch {
       setCopiedIndex(null);
     }
-  };
+  }, []);
 
   if (!open) return null;
   return (
@@ -122,7 +142,7 @@ export function InspectorView({
         const displayRole = toDisplayRole(m.role);
 
         return (
-          <div className={`chat-bubble-wrapper ${displayRole}`} key={i}>
+          <div className={`chat-bubble-wrapper ${displayRole}`} key={`${m.createdAt}:${m.role}:${m.content}`}>
             {displayRole !== "user" && displayRole !== "ai" ? (
               <div className={`chat-avatar ${displayRole}`}>{renderAvatar(displayRole)}</div>
             ) : null}
@@ -145,7 +165,7 @@ export function InspectorView({
                   </svg>
                 )}
               </button>
-              <div className="chat-content">{m.content}</div>
+              <MessageContent content={m.content} />
               <div className="chat-meta">
                 <span className={`role-badge ${displayRole}`}>
                   {renderRoleIcon(displayRole)}

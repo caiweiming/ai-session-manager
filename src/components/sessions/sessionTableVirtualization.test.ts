@@ -114,4 +114,30 @@ describe("sessionTableVirtualization", () => {
       "session:codex:main-2",
     ]);
   });
+
+  it("renders orphan Claude subagent sessions instead of leaving their group empty", () => {
+    const rows = normalizeSessionTableRows([
+      {
+        id: "claude:sub-1",
+        title: "Claude 子会话",
+        tool: "claude",
+        path: "/Users/demo/project",
+        sourceTool: "claude",
+        sourceId: "sub-1",
+        isSubagent: true,
+        parentSourceId: "missing-main-session",
+      },
+    ]);
+    const groups = sortSessionGroups(rows, [], "default");
+
+    const flattened = buildVirtualSessionRows(groups, {
+      "/Users/demo/project": true,
+    });
+
+    expect(flattened.map((row) => `${row.type}:${row.key}`)).toEqual([
+      "group:group-/Users/demo/project",
+      "session:claude:sub-1",
+    ]);
+    expect(flattened[1]).toMatchObject({ isLastChild: true });
+  });
 });

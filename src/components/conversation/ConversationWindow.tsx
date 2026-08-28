@@ -4,6 +4,9 @@ import { InspectorView } from "../inspector/InspectorView";
 import { api, type SessionDetail } from "../../lib/tauriClient";
 import { writeConversationWindowBounds } from "../../lib/conversationWindowState";
 
+const DEFAULT_MESSAGE_LIMIT = 120;
+const MESSAGE_LOAD_STEP = 80;
+
 const normalizeRole = (role: string): "user" | "assistant" | "ai" | "tool" | "dev" => {
   if (role === "user" || role === "assistant" || role === "ai" || role === "tool" || role === "dev") {
     return role;
@@ -22,6 +25,7 @@ const readQuery = () => {
 export function ConversationWindow() {
   const [{ sourceTool, sourceId }] = useState(readQuery);
   const [detail, setDetail] = useState<SessionDetail | null>(null);
+  const [messageLimit, setMessageLimit] = useState(DEFAULT_MESSAGE_LIMIT);
   const [loading, setLoading] = useState(true);
   const [errorText, setErrorText] = useState("");
 
@@ -42,6 +46,7 @@ export function ConversationWindow() {
         const result = await api.getSessionDetail({
           sourceTool,
           sourceId,
+          messageLimit,
         });
         if (!cancelled) {
           if (!result.detail) {
@@ -66,7 +71,7 @@ export function ConversationWindow() {
     return () => {
       cancelled = true;
     };
-  }, [sourceId, sourceTool]);
+  }, [messageLimit, sourceId, sourceTool]);
 
   useEffect(() => {
     let unlistenMoved: (() => void) | null = null;
@@ -146,6 +151,9 @@ export function ConversationWindow() {
   );
 
   const title = detail?.title || `${sourceTool} ${sourceId}`.trim() || "对话记录";
+  const messageLoaded = detail?.messageLoaded ?? messages.length;
+  const messageTotal = detail?.messageTotal ?? messageLoaded;
+  const hasMoreMessages = messageLoaded < messageTotal;
 
   return (
     <main className="conversation-window">
@@ -154,15 +162,26 @@ export function ConversationWindow() {
           {title}
         </div>
         <div className="conversation-window-actions">
+          {detail ? <span className="conversation-window-progress-text">{messageLoaded} / {messageTotal} 条</span> : null}
+          {hasMoreMessages ? (
+            <button
+              className="btn-secondary conversation-window-load-more"
+              aria-label="load-more-conversation-messages"
+              disabled={loading}
+              onClick={() => setMessageLimit((current) => current + MESSAGE_LOAD_STEP)}
+            >
+              {loading ? "加载中..." : "加载更多"}
+            </button>
+          ) : null}
           <button className="btn-secondary conversation-window-close" onClick={() => window.close()}>
             关闭窗口
           </button>
         </div>
       </header>
       <section className="conversation-window-body">
-        {loading ? (
+        {loading && !detail ? (
           <div className="conversation-window-empty">正在加载对话记录...</div>
-        ) : errorText ? (
+        ) : errorText && !detail ? (
           <div className="conversation-window-empty">{errorText}</div>
         ) : (
           <InspectorView open={true} onClose={() => {}} messages={messages} />

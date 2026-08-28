@@ -82,12 +82,18 @@ export const formatTokenCount = (value: number | undefined) => {
     return "--";
   }
 
-  const exact = value.toLocaleString("zh-CN");
   if (value < 10000) {
-    return exact;
+    return formatExactTokenCount(value);
   }
 
-  return `${exact}（${formatCompactChineseCount(value)}）`;
+  return formatCompactChineseCount(value);
+};
+
+export const formatExactTokenCount = (value: number | undefined) => {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return "--";
+  }
+  return value.toLocaleString("zh-CN");
 };
 
 export const copyPlainText = async (text: string) => {

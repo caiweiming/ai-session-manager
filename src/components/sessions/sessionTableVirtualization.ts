@@ -1,7 +1,7 @@
 import type { SessionGroup, VirtualSessionListRow } from "./sessionTableTypes";
 
-export const GROUP_ROW_HEIGHT = 50;
-export const SESSION_ROW_HEIGHT = 50;
+export const GROUP_ROW_HEIGHT = 44;
+export const SESSION_ROW_HEIGHT = 44;
 
 export const buildVirtualSessionRows = (
   groups: SessionGroup[],
@@ -23,17 +23,16 @@ export const buildVirtualSessionRows = (
       continue;
     }
 
-    group.rows.forEach((row, index) => {
-      if (row.isSubagent) {
-        return;
-      }
+    const mainRows = group.rows.filter((row) => !row.isSubagent);
+    const visibleRows = mainRows.length > 0 ? mainRows : group.rows;
+    visibleRows.forEach((row, index) => {
       flattened.push({
         key: row.id,
         type: "session",
         height: SESSION_ROW_HEIGHT,
         groupKey: group.groupKey,
         row,
-        isLastChild: index === group.rows.length - 1,
+        isLastChild: index === visibleRows.length - 1,
       });
     });
   }

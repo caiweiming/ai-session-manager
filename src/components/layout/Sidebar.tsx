@@ -4,6 +4,7 @@ import { SettingsModal } from "../settings/SettingsModal";
 import type { AppSettings, OverviewSummary, TerminalOption } from "../../lib/tauriClient";
 import type { GithubLatestRelease } from "../../lib/updateChecker";
 import { formatToolName, getToolLogoSrc } from "../../lib/toolDisplay";
+import { formatBeijingDateTime, formatBeijingTime } from "./sidebarUtils";
 
 export type SidebarViewMode = "overview" | "trash";
 
@@ -26,34 +27,6 @@ const formatBytes = (value: number | undefined) => {
   const digits = size >= 100 ? 0 : size >= 10 ? 1 : 2;
   const text = size.toFixed(digits).replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
   return `${text} ${units[unitIndex]}`;
-};
-
-const formatBeijingDateTime = (value: number | null | undefined) => {
-  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return "--";
-  try {
-    const parts = new Intl.DateTimeFormat("zh-CN", {
-      timeZone: "Asia/Shanghai",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    }).formatToParts(new Date(value));
-    const map: Record<string, string> = {};
-    for (const part of parts) {
-      if (part.type !== "literal") {
-        map[part.type] = part.value;
-      }
-    }
-    if (!map.year || !map.month || !map.day || !map.hour || !map.minute || !map.second) {
-      return "--";
-    }
-    return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute}:${map.second}`;
-  } catch {
-    return "--";
-  }
 };
 
 const formatUpdateErrorHint = (message: string | null) => {
@@ -248,6 +221,7 @@ export function Sidebar({
     (normalizedScanFailedFiles > 0 && failedFileDetails.length > 0) || ignoredFailedFileCount > 0;
   const hasScanError = typeof scanErrorMessage === "string" && scanErrorMessage.length > 0;
   const lastScanTimeText = formatBeijingDateTime(lastScanAtMs);
+  const lastScanTimeDisplay = formatBeijingTime(lastScanAtMs);
   const totalSessionsCount =
     typeof summary?.totalSessions === "number"
       ? summary.totalSessions
@@ -392,7 +366,7 @@ export function Sidebar({
                 </svg>
               </span>
               全部工具
-              <span className="nav-badge">{totalSessionsCount}</span>
+              <span className="nav-badge tool-session-count">{totalSessionsCount}</span>
             </button>
             {toolStats.map((tool) => {
               const toolClass = normalizeToolClass(tool.sourceTool);
@@ -413,7 +387,7 @@ export function Sidebar({
                     <span className={`filter-dot ${toolClass}`} />
                   )}
                   {label}
-                  <span className="nav-badge">{tool.sessionCount}</span>
+                  <span className="nav-badge tool-session-count">{tool.sessionCount}</span>
                 </button>
               );
             })}
@@ -466,7 +440,9 @@ export function Sidebar({
               </span>
               <span className="sidebar-metric-info">
                 <span className="sidebar-metric-label">扫描异常文件数</span>
-                <span className="sidebar-metric-value">{normalizedScanFailedFiles}</span>
+                <span className={`sidebar-metric-value${normalizedScanFailedFiles > 0 ? " sidebar-metric-value-warning" : ""}`}>
+                  {normalizedScanFailedFiles}
+                </span>
               </span>
             </button>
             {hasScanError ? (
@@ -496,7 +472,7 @@ export function Sidebar({
               <span className="sidebar-metric-info">
                 <span className="sidebar-metric-label">最近扫描</span>
                 <span className="sidebar-metric-value metric-time" title={lastScanTimeText}>
-                  {lastScanTimeText}
+                  {lastScanTimeDisplay}
                 </span>
               </span>
             </div>

@@ -128,6 +128,17 @@ fn codex_parser_should_skip_instruction_like_user_messages_for_title() {
 }
 
 #[test]
+fn codex_parser_should_skip_serialized_image_messages_for_title() {
+    let raw = r##"{"timestamp":"2026-08-26T09:00:00.000Z","type":"session_meta","payload":{"id":"image-title-001","timestamp":"2026-08-26T09:00:00.000Z","cwd":"/Users/demo"}}
+{"timestamp":"2026-08-26T09:00:01.000Z","type":"event_msg","payload":{"type":"user_message","message":"<image name=[Image #1] path=\"/Users/demo/screenshot.png\">"}}
+{"timestamp":"2026-08-26T09:00:02.000Z","type":"event_msg","payload":{"type":"user_message","message":"请优化会话详情面板"}}"##;
+
+    let parsed = parse_codex_session(raw).unwrap();
+    assert_eq!(parsed.source_id, "image-title-001");
+    assert_eq!(parsed.title, "请优化会话详情面板");
+}
+
+#[test]
 fn codex_parser_should_extract_input_and_output_tokens() {
     let raw = r#"{"timestamp":"2026-04-27T10:00:00.000Z","type":"session_meta","payload":{"id":"token-001","timestamp":"2026-04-27T10:00:00.000Z","cwd":"D:\\Works\\ai-session"}}
 {"timestamp":"2026-04-27T10:00:05.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"第一段回复"}],"usage":{"input_tokens":1200,"output_tokens":320}}}

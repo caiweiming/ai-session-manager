@@ -188,6 +188,13 @@ export function MainArea({
     sortMode !== "default" ||
     viewMode !== "overview";
 
+  const filterSummary = [
+    selectedTool ? "工具筛选" : null,
+    searchKeyword.trim() ? `搜索“${searchKeyword.trim()}”` : null,
+    updatedWithinDays !== null ? `最近 ${updatedWithinDays} 天` : null,
+    sortMode !== "default" ? "自定义排序" : null,
+  ].filter((item): item is string => item !== null);
+
   const handleResetFilters = () => {
     onResetBrowseState();
     setSortMode("default");
@@ -249,27 +256,22 @@ export function MainArea({
             }
             className="toolbar-custom-select"
           />
-          <button
-            className="btn-secondary toolbar-inline-btn"
-            onClick={handleResetFilters}
-            disabled={!isResetEnabled}
-          >
-            重置筛选
-          </button>
-          {viewMode === "trash" ? (
+          {isResetEnabled ? (
             <button
-              className="btn-secondary toolbar-inline-btn"
-              onClick={() => {
-                void handleBatchRestore();
-              }}
-              disabled={selectedIds.length === 0 || batchRestoring || clearingTrash}
+              className="btn-secondary toolbar-icon-btn toolbar-neutral-action"
+              onClick={handleResetFilters}
+              aria-label="reset-session-filters"
+              title="重置筛选"
             >
-              {batchRestoring ? "恢复中..." : `恢复所选${selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}`}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M3 12a9 9 0 1 0 2.64-6.36" />
+                <polyline points="3 3 3 9 9 9" />
+              </svg>
             </button>
           ) : null}
           {viewMode === "trash" ? (
             <button
-              className="btn-secondary toolbar-inline-btn"
+              className="btn-secondary toolbar-inline-btn toolbar-neutral-action"
               onClick={handleClearTrashClick}
               disabled={clearingTrash || trashClearInFlight}
             >
@@ -277,32 +279,58 @@ export function MainArea({
             </button>
           ) : null}
           <button
-            className="btn-secondary toolbar-inline-btn"
+            className="btn-secondary toolbar-icon-btn toolbar-neutral-action"
             aria-label="group-expand-toggle"
             onClick={handleGroupToggle}
             disabled={!groupExpandState.hasGroups}
+            title={groupExpandState.allExpanded ? "收起全部目录" : "展开全部目录"}
           >
-            {groupExpandState.allExpanded ? "全部折叠" : "全部展开"}
-          </button>
-          <button
-            className={`btn btn-danger btn-danger-solid${selectedIds.length > 0 ? " active" : ""}`}
-            disabled={selectedIds.length === 0 || batchDeleting}
-            onClick={handleBatchDeleteClick}
-            aria-label="batch-delete-sessions"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              {groupExpandState.allExpanded ? (
+                <>
+                  <polyline points="7 10 12 5 17 10" />
+                  <polyline points="7 15 12 10 17 15" />
+                </>
+              ) : (
+                <>
+                  <polyline points="7 9 12 14 17 9" />
+                  <polyline points="7 14 12 19 17 14" />
+                </>
+              )}
             </svg>
-            {batchDeleting
-              ? "批量删除中..."
-              : `${
-                  viewMode === "trash"
-                    ? "批量永久删除"
-                    : "批量删除"
-                }${selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}`}
+            <span className="sr-only">{groupExpandState.allExpanded ? "收起全部目录" : "展开全部目录"}</span>
           </button>
+          {selectedIds.length > 0 ? (
+            <div className="toolbar-selection-actions" aria-live="polite">
+              {viewMode === "trash" ? (
+                <button
+                  className="btn-secondary toolbar-inline-btn toolbar-neutral-action"
+                  onClick={() => void handleBatchRestore()}
+                  disabled={batchRestoring || clearingTrash}
+                >
+                  {batchRestoring ? "恢复中..." : `恢复所选 (${selectedIds.length})`}
+                </button>
+              ) : null}
+              <button
+                className="btn btn-danger btn-danger-solid active"
+                disabled={batchDeleting}
+                onClick={handleBatchDeleteClick}
+                aria-label="batch-delete-sessions"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2 2V6m3 0V4a2 2 0 0 1 2 2v2" />
+                </svg>
+                {batchDeleting ? "批量删除中..." : `${viewMode === "trash" ? "批量永久删除" : "批量删除"} (${selectedIds.length})`}
+              </button>
+            </div>
+          ) : null}
         </div>
+      </div>
+
+      <div className="session-list-summary" aria-live="polite">
+        <span>当前 {rows.length} 个会话</span>
+        {filterSummary.map((filter) => <span key={filter}>{filter}</span>)}
       </div>
 
       {scanErrorMessage && !scanInFlight ? (

@@ -2,48 +2,6 @@ import { InspectorView } from "../inspector/InspectorView";
 import { normalizeWindowsDriveLetter } from "../../lib/pathDisplay";
 import type { SessionDetail, SubagentSessionRow } from "../../lib/tauriClient";
 
-export function InspectorHardDeleteConfirmModal({
-  open,
-  busy,
-  onClose,
-  onConfirm,
-}: {
-  open: boolean;
-  busy: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div
-      className={`modal-overlay${open ? " active" : ""}`}
-      data-testid="inspector-hard-delete-confirm-modal"
-      onClick={onClose}
-      aria-hidden={!open}
-    >
-      <div className="modal-card confirm-modal-card" onClick={(event) => event.stopPropagation()}>
-        <div className="modal-header">
-          <h3>确认永久删除</h3>
-          <button className="btn-close" aria-label="close-inspector-hard-delete-confirm" onClick={onClose}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-        <div className="confirm-modal-body">将永久删除此会话记录，且不可恢复。</div>
-        <div className="confirm-modal-actions">
-          <button className="btn-secondary" onClick={onClose}>
-            取消
-          </button>
-          <button className="btn btn-danger active btn-danger-solid" aria-label="confirm-inspector-hard-delete" disabled={busy} onClick={onConfirm}>
-            {busy ? "删除中..." : "确认永久删除"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function InspectorSubagentSummaryModal({
   open,
   subagentRows,
@@ -131,6 +89,8 @@ export function InspectorConversationModal({
   title,
   sourcePath,
   messages,
+  detailLoading,
+  onLoadMoreMessages,
   onClose,
 }: {
   open: boolean;
@@ -142,19 +102,46 @@ export function InspectorConversationModal({
     content: string;
     createdAt: string;
   }>;
+  detailLoading: boolean;
+  onLoadMoreMessages: () => void;
   onClose: () => void;
 }) {
+  const messageLoaded = detail?.messageLoaded ?? messages.length;
+  const messageTotal = detail?.messageTotal ?? messageLoaded;
+  const hasMoreMessages = messageLoaded < messageTotal;
+
   return open ? (
     <div className="modal-overlay active" data-testid="conversation-modal" onClick={onClose} aria-hidden={false}>
       <div className="modal-card conversation-modal-card" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <h3>对话记录</h3>
-          <button className="btn-close" aria-label="close-conversation-modal" onClick={onClose}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+          <div className="conversation-modal-header-actions">
+            {detail ? <span className="conversation-modal-progress-text">{messageLoaded} / {messageTotal} 条</span> : null}
+            {hasMoreMessages ? (
+              <button
+                className="btn-secondary conversation-modal-load-more"
+                aria-label="load-more-conversation-modal-messages"
+                disabled={detailLoading}
+                onClick={onLoadMoreMessages}
+              >
+                {detailLoading ? (
+                  <>
+                    <svg className="conversation-modal-loading-spinner" viewBox="0 0 16 16" aria-hidden="true">
+                      <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeOpacity="0.24" strokeWidth="2" />
+                      <path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                    正在加载
+                  </>
+                ) : "加载更多"}
+              </button>
+            ) : null}
+            <button className="btn-close" aria-label="close-conversation-modal" onClick={onClose}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
         </div>
         <div className="conversation-modal-body">
           <div className="conversation-modal-detail-header">
@@ -162,6 +149,12 @@ export function InspectorConversationModal({
             <span className="conversation-modal-detail-meta">{sourcePath}</span>
           </div>
           <section className="conversation-modal-content">
+            {detailLoading && detail ? (
+              <div className="conversation-modal-loading-status" role="status" aria-live="polite">
+                <span className="conversation-modal-loading-dot" aria-hidden="true" />
+                正在加载更多对话记录
+              </div>
+            ) : null}
             {detail ? (
               <InspectorView open={true} onClose={() => {}} messages={messages} />
             ) : (

@@ -461,6 +461,7 @@ fn is_instruction_like_title_text(content: &str) -> bool {
         || lower.contains("<environment_context>")
         || lower.starts_with("# agents.md instructions")
         || lower.contains("### available skills")
+        || (lower.starts_with("<image ") && lower.contains("path="))
 }
 
 fn extract_updated_at(session_entry: Option<&Value>, entries: &[Value]) -> String {

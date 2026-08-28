@@ -14,6 +14,8 @@ it("renders group and session rows with action handlers in the virtual row layou
       sourceTool: "codex",
       sourceId: "session-1",
       path: "D:\\Works\\demo",
+      createdAt: "2026-08-20 09:15:00",
+      updatedAt: "2026-08-20 10:30:00",
     },
     {
       id: "codex:2",
@@ -41,7 +43,7 @@ it("renders group and session rows with action handlers in the virtual row layou
       <SessionTableGroupRow
         group={group}
         expanded={true}
-        groupSelected={false}
+        groupSelected={true}
         highlightKeyword="会话"
         onToggleRows={onToggleGroupRows}
         onToggleExpanded={onToggleGroupExpanded}
@@ -66,7 +68,8 @@ it("renders group and session rows with action handlers in the virtual row layou
   );
 
   fireEvent.click(screen.getByLabelText(`select-group-${group.displayPath}`));
-  expect(onToggleGroupRows).toHaveBeenCalledWith(true);
+  expect(onToggleGroupRows).toHaveBeenCalledWith(false);
+  expect(screen.getByLabelText(`select-group-${group.displayPath}`).closest('[role="row"]')).toHaveClass("checked");
 
   fireEvent.click(screen.getByLabelText(`toggle-group-${group.displayPath}`));
   expect(onToggleGroupExpanded).toHaveBeenCalled();
@@ -86,6 +89,9 @@ it("renders group and session rows with action handlers in the virtual row layou
   fireEvent.click(screen.getByLabelText("delete-row-codex:1"));
   expect(onOpenDeletePopover).toHaveBeenCalled();
 
-  expect(screen.getByText("主会话")).toBeInTheDocument();
+  expect(document.querySelector(".session-meta-text")).toHaveTextContent("主会话 · --");
   expect(document.querySelectorAll(".search-highlight").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("2026-08-20 10:30").length).toBeGreaterThan(0);
+  expect(screen.getAllByTitle("2026-08-20 10:30:00")[0]).toHaveTextContent("2026-08-20 10:30");
+  expect(screen.queryByTitle("2026-08-20 09:15:00")).not.toBeInTheDocument();
 });

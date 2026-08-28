@@ -266,7 +266,7 @@ fn create_terminal_resume_launcher(shell_command: &str) -> Result<PathBuf> {
 
 fn terminal_resume_launcher_script(shell_command: &str, profile_path: &Path) -> String {
     format!(
-        "#!/bin/sh\nrm -f -- \"$0\" {}\nexec \"${{SHELL:-/bin/sh}}\" -lc {}\n",
+        "#!/bin/sh\nrm -f -- \"$0\" {}\n\"${{SHELL:-/bin/sh}}\" -lc {}\nresume_exit_code=$?\nif [ \"$resume_exit_code\" -ne 0 ]; then\n  printf '\\n恢复会话失败（退出码 %s）。请查看上方错误信息。\\n' \"$resume_exit_code\"\n  exec \"${{SHELL:-/bin/sh}}\"\nfi\nexit \"$resume_exit_code\"\n",
         shell_single_quote(&profile_path.to_string_lossy()),
         shell_single_quote(shell_command)
     )
@@ -334,7 +334,7 @@ fn create_iterm_resume_launcher(shell_command: &str) -> Result<PathBuf> {
 
 fn iterm_resume_launcher_script(shell_command: &str) -> String {
     format!(
-        "#!/bin/sh\nrm -f -- \"$0\"\nexec \"${{SHELL:-/bin/sh}}\" -lc {}\n",
+        "#!/bin/sh\nrm -f -- \"$0\"\n\"${{SHELL:-/bin/sh}}\" -lc {}\nresume_exit_code=$?\nif [ \"$resume_exit_code\" -ne 0 ]; then\n  printf '\\n恢复会话失败（退出码 %s）。请查看上方错误信息。\\n' \"$resume_exit_code\"\n  exec \"${{SHELL:-/bin/sh}}\"\nfi\nexit \"$resume_exit_code\"\n",
         shell_single_quote(shell_command)
     )
 }
@@ -417,7 +417,7 @@ mod tests {
     }
 
     #[test]
-    fn terminal_launcher_script_should_remove_profile_and_execute_restore_command() {
+    fn terminal_launcher_script_should_keep_terminal_open_when_restore_command_fails() {
         let script = terminal_resume_launcher_script(
             "cd '/tmp/work' && codex resume 'session-1'",
             &PathBuf::from("/tmp/ai-session-resume.terminal"),
@@ -425,7 +425,12 @@ mod tests {
 
         assert!(script.starts_with("#!/bin/sh\n"));
         assert!(script.contains("rm -f -- \"$0\" '/tmp/ai-session-resume.terminal'"));
-        assert!(script.contains("exec \"${SHELL:-/bin/sh}\" -lc 'cd '\"'\"'/tmp/work'\"'\"' && codex resume '\"'\"'session-1'\"'\"''"));
+        assert!(script.contains("\"${SHELL:-/bin/sh}\" -lc 'cd '\"'\"'/tmp/work'\"'\"' && codex resume '\"'\"'session-1'\"'\"''"));
+        assert!(script.contains("resume_exit_code=$?"));
+        assert!(script.contains("if [ \"$resume_exit_code\" -ne 0 ]; then"));
+        assert!(script.contains("恢复会话失败（退出码 %s）"));
+        assert!(script.contains("exec \"${SHELL:-/bin/sh}\""));
+        assert!(script.contains("exit \"$resume_exit_code\""));
     }
 
     #[test]
@@ -447,11 +452,16 @@ mod tests {
     }
 
     #[test]
-    fn iterm_launcher_script_should_execute_restore_command() {
+    fn iterm_launcher_script_should_keep_terminal_open_when_restore_command_fails() {
         let script = iterm_resume_launcher_script("cd '/tmp/work' && codex resume 'session-1'");
 
         assert!(script.starts_with("#!/bin/sh\n"));
         assert!(script.contains("rm -f -- \"$0\""));
-        assert!(script.contains("exec \"${SHELL:-/bin/sh}\" -lc 'cd '\"'\"'/tmp/work'\"'\"' && codex resume '\"'\"'session-1'\"'\"''"));
+        assert!(script.contains("\"${SHELL:-/bin/sh}\" -lc 'cd '\"'\"'/tmp/work'\"'\"' && codex resume '\"'\"'session-1'\"'\"''"));
+        assert!(script.contains("resume_exit_code=$?"));
+        assert!(script.contains("if [ \"$resume_exit_code\" -ne 0 ]; then"));
+        assert!(script.contains("恢复会话失败（退出码 %s）"));
+        assert!(script.contains("exec \"${SHELL:-/bin/sh}\""));
+        assert!(script.contains("exit \"$resume_exit_code\""));
     }
 }

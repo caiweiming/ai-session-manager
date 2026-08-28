@@ -268,14 +268,30 @@ export function AppShell() {
     sessionsState,
   };
 
+  const activeSession = useMemo(
+    () => {
+      const row = rows.find((candidate) => candidate.id === activeSessionId);
+      if (!row?.sourceTool || !row.sourceId) {
+        return null;
+      }
+      return {
+        sourceTool: row.sourceTool,
+        sourceId: row.sourceId,
+        title: row.title || row.sourceId,
+        isSubagent: row.isSubagent,
+      };
+    },
+    [activeSessionId, rows],
+  );
+
   const detailPanel = {
     open: inspectorOpen,
     onClose: handleCloseInspector,
     detail,
     detailLoading,
+    activeSession,
     subagentRows,
     subagentsLoading,
-    defaultHardDelete: appSettings.hardDelete,
     onLoadMoreMessages: handleLoadMoreMessages,
   };
 
