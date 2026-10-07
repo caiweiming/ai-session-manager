@@ -9,6 +9,14 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tempfile::tempdir;
 
+fn fixture_path(value: &str) -> PathBuf {
+    if std::path::MAIN_SEPARATOR == '\\' {
+        PathBuf::from(value)
+    } else {
+        PathBuf::from(value.replace('\\', "/"))
+    }
+}
+
 #[test]
 fn debounce_should_merge_burst_events() {
     let events = vec!["a", "a", "a", "b"];
@@ -65,39 +73,39 @@ fn map_notify_event_should_filter_supported_paths_and_expand_rename() {
     let roots = vec![
         WatchRoot {
             source_tool: "codex".to_string(),
-            root_path: PathBuf::from("D:\\home\\.codex"),
+            root_path: fixture_path("D:\\home\\.codex"),
         },
         WatchRoot {
             source_tool: "claude".to_string(),
-            root_path: PathBuf::from("D:\\home\\.claude"),
+            root_path: fixture_path("D:\\home\\.claude"),
         },
         WatchRoot {
             source_tool: "gemini".to_string(),
-            root_path: PathBuf::from("D:\\home\\.gemini"),
+            root_path: fixture_path("D:\\home\\.gemini"),
         },
     ];
 
     let rename_event = Event {
         kind: EventKind::Modify(ModifyKind::Name(RenameMode::Both)),
         paths: vec![
-            PathBuf::from("D:\\home\\.codex\\sessions\\old-session.jsonl"),
-            PathBuf::from("D:\\home\\.codex\\sessions\\new-session.jsonl"),
+            fixture_path("D:\\home\\.codex\\sessions\\old-session.jsonl"),
+            fixture_path("D:\\home\\.codex\\sessions\\new-session.jsonl"),
         ],
         attrs: Default::default(),
     };
     let create_event = Event {
         kind: EventKind::Create(CreateKind::File),
         paths: vec![
-            PathBuf::from("D:\\home\\.claude\\projects\\demo\\session.jsonl"),
-            PathBuf::from("D:\\home\\.claude\\projects\\demo\\sessions-index.json"),
+            fixture_path("D:\\home\\.claude\\projects\\demo\\session.jsonl"),
+            fixture_path("D:\\home\\.claude\\projects\\demo\\sessions-index.json"),
         ],
         attrs: Default::default(),
     };
     let remove_event = Event {
         kind: EventKind::Remove(RemoveKind::File),
         paths: vec![
-            PathBuf::from("D:\\home\\.gemini\\tmp\\demo\\chats\\session-1.json"),
-            PathBuf::from("D:\\home\\.gemini\\tmp\\demo\\other\\ignore.txt"),
+            fixture_path("D:\\home\\.gemini\\tmp\\demo\\chats\\session-1.json"),
+            fixture_path("D:\\home\\.gemini\\tmp\\demo\\other\\ignore.txt"),
         ],
         attrs: Default::default(),
     };
@@ -111,12 +119,12 @@ fn map_notify_event_should_filter_supported_paths_and_expand_rename() {
         vec![
             WatchEvent {
                 source_tool: "codex".to_string(),
-                path: PathBuf::from("D:\\home\\.codex\\sessions\\old-session.jsonl"),
+                path: fixture_path("D:\\home\\.codex\\sessions\\old-session.jsonl"),
                 kind: WatchEventKind::Remove,
             },
             WatchEvent {
                 source_tool: "codex".to_string(),
-                path: PathBuf::from("D:\\home\\.codex\\sessions\\new-session.jsonl"),
+                path: fixture_path("D:\\home\\.codex\\sessions\\new-session.jsonl"),
                 kind: WatchEventKind::Upsert,
             },
         ]
@@ -125,7 +133,7 @@ fn map_notify_event_should_filter_supported_paths_and_expand_rename() {
         create_mapped,
         vec![WatchEvent {
             source_tool: "claude".to_string(),
-            path: PathBuf::from("D:\\home\\.claude\\projects\\demo\\session.jsonl"),
+            path: fixture_path("D:\\home\\.claude\\projects\\demo\\session.jsonl"),
             kind: WatchEventKind::Upsert,
         }]
     );
@@ -133,7 +141,7 @@ fn map_notify_event_should_filter_supported_paths_and_expand_rename() {
         remove_mapped,
         vec![WatchEvent {
             source_tool: "gemini".to_string(),
-            path: PathBuf::from("D:\\home\\.gemini\\tmp\\demo\\chats\\session-1.json"),
+            path: fixture_path("D:\\home\\.gemini\\tmp\\demo\\chats\\session-1.json"),
             kind: WatchEventKind::Remove,
         }]
     );
@@ -143,14 +151,14 @@ fn map_notify_event_should_filter_supported_paths_and_expand_rename() {
 fn map_notify_event_should_ignore_codex_root_history_file() {
     let roots = vec![WatchRoot {
         source_tool: "codex".to_string(),
-        root_path: PathBuf::from("D:\\home\\.codex\\sessions"),
+        root_path: fixture_path("D:\\home\\.codex\\sessions"),
     }];
 
     let event = Event {
         kind: EventKind::Create(CreateKind::File),
         paths: vec![
-            PathBuf::from("D:\\home\\.codex\\history.jsonl"),
-            PathBuf::from("D:\\home\\.codex\\sessions\\2026\\05\\17\\session-1.jsonl"),
+            fixture_path("D:\\home\\.codex\\history.jsonl"),
+            fixture_path("D:\\home\\.codex\\sessions\\2026\\05\\17\\session-1.jsonl"),
         ],
         attrs: Default::default(),
     };
@@ -161,7 +169,7 @@ fn map_notify_event_should_ignore_codex_root_history_file() {
         mapped,
         vec![WatchEvent {
             source_tool: "codex".to_string(),
-            path: PathBuf::from("D:\\home\\.codex\\sessions\\2026\\05\\17\\session-1.jsonl"),
+            path: fixture_path("D:\\home\\.codex\\sessions\\2026\\05\\17\\session-1.jsonl"),
             kind: WatchEventKind::Upsert,
         }]
     );
@@ -171,14 +179,14 @@ fn map_notify_event_should_ignore_codex_root_history_file() {
 fn map_notify_event_should_ignore_codex_history_file_in_root_fallback_mode() {
     let roots = vec![WatchRoot {
         source_tool: "codex".to_string(),
-        root_path: PathBuf::from("D:\\home\\.codex"),
+        root_path: fixture_path("D:\\home\\.codex"),
     }];
 
     let event = Event {
         kind: EventKind::Create(CreateKind::File),
         paths: vec![
-            PathBuf::from("D:\\home\\.codex\\history.jsonl"),
-            PathBuf::from("D:\\home\\.codex\\session.json"),
+            fixture_path("D:\\home\\.codex\\history.jsonl"),
+            fixture_path("D:\\home\\.codex\\session.json"),
         ],
         attrs: Default::default(),
     };
@@ -189,7 +197,7 @@ fn map_notify_event_should_ignore_codex_history_file_in_root_fallback_mode() {
         mapped,
         vec![WatchEvent {
             source_tool: "codex".to_string(),
-            path: PathBuf::from("D:\\home\\.codex\\session.json"),
+            path: fixture_path("D:\\home\\.codex\\session.json"),
             kind: WatchEventKind::Upsert,
         }]
     );
@@ -199,14 +207,14 @@ fn map_notify_event_should_ignore_codex_history_file_in_root_fallback_mode() {
 fn map_notify_event_should_ignore_claude_root_history_file() {
     let roots = vec![WatchRoot {
         source_tool: "claude".to_string(),
-        root_path: PathBuf::from("D:\\home\\.claude\\projects"),
+        root_path: fixture_path("D:\\home\\.claude\\projects"),
     }];
 
     let event = Event {
         kind: EventKind::Create(CreateKind::File),
         paths: vec![
-            PathBuf::from("D:\\home\\.claude\\history.jsonl"),
-            PathBuf::from("D:\\home\\.claude\\projects\\demo\\session.jsonl"),
+            fixture_path("D:\\home\\.claude\\history.jsonl"),
+            fixture_path("D:\\home\\.claude\\projects\\demo\\session.jsonl"),
         ],
         attrs: Default::default(),
     };
@@ -217,7 +225,7 @@ fn map_notify_event_should_ignore_claude_root_history_file() {
         mapped,
         vec![WatchEvent {
             source_tool: "claude".to_string(),
-            path: PathBuf::from("D:\\home\\.claude\\projects\\demo\\session.jsonl"),
+            path: fixture_path("D:\\home\\.claude\\projects\\demo\\session.jsonl"),
             kind: WatchEventKind::Upsert,
         }]
     );
