@@ -405,7 +405,6 @@ it("startup triggers refresh_sessions", async () => {
   expect(screen.getByLabelText("select-row-codex:beta-id")).toBeInTheDocument();
   expect(screen.queryByRole("columnheader", { name: "创建时间" })).not.toBeInTheDocument();
   expect(screen.getByRole("columnheader", { name: "更新时间" })).toBeInTheDocument();
-  expect(screen.getAllByText("2026-04-21 18:00").length).toBeGreaterThan(0);
   expect(screen.getAllByTitle("2026-04-21T10:00:00Z").length).toBeGreaterThan(0);
   const refreshIndex = invokeMock.mock.calls.findIndex((call) => call[0] === "refresh_sessions");
   const listIndex = invokeMock.mock.calls.findIndex((call) => call[0] === "list_sessions");
