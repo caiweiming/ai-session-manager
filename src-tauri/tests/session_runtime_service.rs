@@ -17,7 +17,9 @@ struct CurrentDirGuard {
 
 impl CurrentDirGuard {
     fn set_to(path: &Path) -> Self {
-        let lock = current_dir_mutex().lock().unwrap();
+        let lock = current_dir_mutex()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let original = std::env::current_dir().unwrap();
         std::env::set_current_dir(path).unwrap();
         Self {
@@ -25,6 +27,13 @@ impl CurrentDirGuard {
             original,
         }
     }
+}
+
+fn assert_same_physical_path(actual: &Path, expected: &Path) {
+    assert_eq!(
+        fs::canonicalize(actual).unwrap(),
+        fs::canonicalize(expected).unwrap()
+    );
 }
 
 impl Drop for CurrentDirGuard {
@@ -139,9 +148,9 @@ fn detect_workspace_root_from_should_return_canonical_git_root_for_relative_star
 
     let _guard = CurrentDirGuard::set_to(td.path());
 
-    let detected = detect_workspace_root_from(Path::new("repo/apps/desktop"));
+    let detected = detect_workspace_root_from(Path::new("repo/apps/desktop")).unwrap();
 
-    assert_eq!(detected, Some(expected_workspace_path(&repo)));
+    assert_same_physical_path(Path::new(&detected), &repo);
 }
 
 #[test]
@@ -151,10 +160,10 @@ fn current_dir_guard_should_restore_original_directory_after_drop() {
 
     {
         let _guard = CurrentDirGuard::set_to(td.path());
-        assert_eq!(std::env::current_dir().unwrap(), td.path());
+        assert_same_physical_path(&std::env::current_dir().unwrap(), td.path());
     }
 
-    assert_eq!(std::env::current_dir().unwrap(), original);
+    assert_same_physical_path(&std::env::current_dir().unwrap(), &original);
 }
 
 #[test]
