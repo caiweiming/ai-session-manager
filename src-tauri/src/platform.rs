@@ -14,6 +14,7 @@ pub struct PlatformCapabilities {
     pub supports_reveal_path: bool,
     pub supports_resume_in_terminal: bool,
     pub reveal_path_degrades_to_open_parent: bool,
+    pub is_elevated: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

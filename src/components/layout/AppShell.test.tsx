@@ -53,6 +53,7 @@ type FailedFilesScenarioOptions = {
     supportsRevealPath: boolean;
     supportsResumeInTerminal: boolean;
     revealPathDegradesToOpenParent: boolean;
+    isElevated?: boolean;
   }>;
   commandHandlers?: Record<
     string,
@@ -371,6 +372,20 @@ it("places app version under the brand title next to the logo", async () => {
 
   expect(brandMeta).not.toBeNull();
   expect(brandMeta).toContainElement(screen.getByLabelText("app-update-entry"));
+});
+
+it("shows a dismissible notice when Windows is elevated", async () => {
+  setupFailedFilesScenario({
+    failedFileDetails: [],
+    platformCapabilities: { isElevated: true },
+  });
+
+  render(<AppShell />);
+
+  const notice = await screen.findByTestId("elevated-recovery-notice");
+  expect(notice).toHaveTextContent("Codex 恢复将自动使用无 daemon 模式。");
+  await clickElement(within(notice).getByRole("button", { name: "知道了" }));
+  expect(screen.queryByTestId("elevated-recovery-notice")).not.toBeInTheDocument();
 });
 
 it("startup triggers refresh_sessions", async () => {
@@ -1131,8 +1146,7 @@ it("shows reset button only when list state leaves default and resets search, fi
     expect(screen.getByLabelText("rescan-local-data")).not.toBeDisabled();
   });
 
-  const resetButton = screen.getByRole("button", { name: "重置筛选" });
-  expect(resetButton).toBeDisabled();
+  expect(screen.queryByLabelText("reset-session-filters")).not.toBeInTheDocument();
 
   fireEvent.change(screen.getByLabelText("session-search-input"), {
     target: { value: "排查" },
@@ -1144,13 +1158,13 @@ it("shows reset button only when list state leaves default and resets search, fi
   fireEvent.click(screen.getByLabelText("switch-trash"));
 
   await waitFor(() => {
-    expect(screen.getByRole("button", { name: "重置筛选" })).not.toBeDisabled();
+    expect(screen.getByLabelText("reset-session-filters")).toBeInTheDocument();
   });
 
-  fireEvent.click(screen.getByRole("button", { name: "重置筛选" }));
+  fireEvent.click(screen.getByLabelText("reset-session-filters"));
 
   await waitFor(() => {
-    expect(screen.getByRole("button", { name: "重置筛选" })).toBeDisabled();
+    expect(screen.queryByLabelText("reset-session-filters")).not.toBeInTheDocument();
     expect(screen.getByLabelText("session-search-input")).toHaveValue("");
     expect(screen.queryByText("回收站会话")).not.toBeInTheDocument();
     expect(screen.getByLabelText("session-date-filter")).toHaveTextContent("全部时间");
@@ -1170,18 +1184,18 @@ it("uses one group toggle button that switches label with group expand state", a
   });
 
   const toggleButton = screen.getByLabelText("group-expand-toggle");
-  expect(toggleButton).toHaveTextContent("全部展开");
+  expect(toggleButton).toHaveTextContent("展开全部目录");
 
   fireEvent.click(toggleButton);
 
   await waitFor(() => {
-    expect(screen.getByLabelText("group-expand-toggle")).toHaveTextContent("全部折叠");
+    expect(screen.getByLabelText("group-expand-toggle")).toHaveTextContent("收起全部目录");
   });
 
   fireEvent.click(screen.getByLabelText("group-expand-toggle"));
 
   await waitFor(() => {
-    expect(screen.getByLabelText("group-expand-toggle")).toHaveTextContent("全部展开");
+    expect(screen.getByLabelText("group-expand-toggle")).toHaveTextContent("展开全部目录");
   });
 
   expect(screen.queryByLabelText("expand-all-groups")).not.toBeInTheDocument();
@@ -1612,24 +1626,22 @@ it("exports session markdown from inspector action", async () => {
   });
 });
 
-it("deletes from inspector with hardDelete enabled when switch is on", async () => {
+it("deletes from inspector to trash without exposing a hard-delete toggle", async () => {
   render(<AppShell />);
 
   await expandAllGroups();
   fireEvent.click(await screen.findByText("真实会话 Alpha：排查 S3 签名失效"));
   await screen.findByText("S3 签名问题定位");
 
-  fireEvent.click(screen.getByLabelText("hard-delete-toggle"));
-  fireEvent.click(await screen.findByRole("button", { name: "永久删除此记录" }));
-  expect(await screen.findByTestId("inspector-hard-delete-confirm-modal")).toHaveClass("active");
-  fireEvent.click(screen.getByLabelText("confirm-inspector-hard-delete"));
+  expect(screen.queryByLabelText("hard-delete-toggle")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "删除此记录" }));
 
   await waitFor(() => {
     expect(invokeMock).toHaveBeenCalledWith("delete_session", {
       payload: {
         sourceTool: "codex",
         sourceId: "alpha-id",
-        hardDelete: true,
+        hardDelete: false,
         cascadeSubagents: true,
       },
     });
@@ -1697,7 +1709,7 @@ it("opens subagent summary modal and replays subagent conversation", async () =>
       payload: { sourceTool: "codex", parentSourceId: "alpha-id", inTrash: false },
     });
   });
-  await screen.findByText("1 个");
+  expect(await screen.findByLabelText("open-subagent-summary")).toHaveTextContent("子代理 1 个");
 
   fireEvent.click(screen.getByLabelText("open-subagent-summary"));
   expect(await screen.findByTestId("subagent-summary-modal")).toHaveClass("active");
@@ -1715,7 +1727,8 @@ it("opens subagent summary modal and replays subagent conversation", async () =>
   expect(screen.getByTestId("subagent-summary-modal")).not.toHaveClass("active");
 });
 
-it("clicking summary entry shows empty tip when no subagent sessions", async () => {
+it("hides the subagent summary entry when no subagent sessions exist", async () => {
+  const subagentListDeferred = createDeferred<{ rows: [] }>();
   invokeMock.mockImplementation(async (cmd: string, args?: { payload?: { sourceTool?: string; sourceId?: string; includeSubagent?: boolean; messageLimit?: number } }) => {
     if (cmd === "get_runtime_workspace") return "D:\\Works\\ai-session";
     if (cmd === "get_app_settings") {
@@ -1733,7 +1746,7 @@ it("clicking summary entry shows empty tip when no subagent sessions", async () 
     }
     if (cmd === "refresh_sessions") return { scannedFiles: 1, indexedSessions: 1, failedFiles: 0 };
     if (cmd === "list_sessions") return { rows: defaultRows };
-    if (cmd === "list_subagent_sessions") return { rows: [] };
+    if (cmd === "list_subagent_sessions") return subagentListDeferred.promise;
     if (cmd === "get_session_detail") {
       const sourceTool = args?.payload?.sourceTool ?? "codex";
       const sourceId = args?.payload?.sourceId ?? "alpha-id";
@@ -1761,11 +1774,15 @@ it("clicking summary entry shows empty tip when no subagent sessions", async () 
       payload: { sourceTool: "codex", parentSourceId: "alpha-id", inTrash: false },
     });
   });
-  await screen.findByText("0 个");
+  expect(await screen.findByLabelText("open-subagent-summary")).toHaveTextContent("子代理 加载中...");
 
-  fireEvent.click(screen.getByLabelText("open-subagent-summary"));
-  expect(await screen.findByText("当前主会话无子代理会话。")).toBeInTheDocument();
-  expect(screen.getByTestId("subagent-summary-modal")).not.toHaveClass("active");
+  await act(async () => {
+    subagentListDeferred.resolve({ rows: [] });
+  });
+
+  await waitFor(() => {
+    expect(screen.queryByLabelText("open-subagent-summary")).not.toBeInTheDocument();
+  });
 });
 
 it("clicking the same session twice closes inspector", async () => {
@@ -2796,8 +2813,8 @@ it("shows update-available state in the version entry and opens the update popov
   global.fetch = vi.fn(async () => ({
     ok: true,
     json: async () => ({
-      tag_name: "v0.2.0",
-      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
+      tag_name: "v9.9.9",
+      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v9.9.9",
       published_at: "2026-05-29T12:00:00Z",
       body: "更新说明",
     }),
@@ -2813,7 +2830,7 @@ it("shows update-available state in the version entry and opens the update popov
 
   await clickElement(screen.getByLabelText("app-update-entry"));
   expect(screen.getByTestId("update-popover")).toBeInTheDocument();
-  expect(screen.getByText("v0.2.0")).toBeInTheDocument();
+  expect(screen.getByText("v9.9.9")).toBeInTheDocument();
 });
 
 it("checks updates against the public GitHub repository", async () => {
@@ -2884,8 +2901,8 @@ it("renders the update popover outside the sidebar clipping container", async ()
   global.fetch = vi.fn(async () => ({
     ok: true,
     json: async () => ({
-      tag_name: "v0.2.0",
-      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
+      tag_name: "v9.9.9",
+      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v9.9.9",
       published_at: "2026-05-29T12:00:00Z",
       body: "更新说明",
     }),
@@ -2910,8 +2927,8 @@ it("closes the update popover when clicking outside", async () => {
   global.fetch = vi.fn(async () => ({
     ok: true,
     json: async () => ({
-      tag_name: "v0.2.0",
-      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
+      tag_name: "v9.9.9",
+      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v9.9.9",
       published_at: "2026-05-29T12:00:00Z",
       body: "更新说明",
     }),
@@ -2939,8 +2956,8 @@ it("closes the update popover when pressing Escape", async () => {
   global.fetch = vi.fn(async () => ({
     ok: true,
     json: async () => ({
-      tag_name: "v0.2.0",
-      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
+      tag_name: "v9.9.9",
+      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v9.9.9",
       published_at: "2026-05-29T12:00:00Z",
       body: "更新说明",
     }),
@@ -2973,8 +2990,8 @@ it("repositions the update popover when the window resizes", async () => {
   global.fetch = vi.fn(async () => ({
     ok: true,
     json: async () => ({
-      tag_name: "v0.2.0",
-      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
+      tag_name: "v9.9.9",
+      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v9.9.9",
       published_at: "2026-05-29T12:00:00Z",
       body: "更新说明",
     }),
@@ -3032,8 +3049,8 @@ it("repositions the update popover when the window scrolls", async () => {
   global.fetch = vi.fn(async () => ({
     ok: true,
     json: async () => ({
-      tag_name: "v0.2.0",
-      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
+      tag_name: "v9.9.9",
+      html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v9.9.9",
       published_at: "2026-05-29T12:00:00Z",
       body: "更新说明",
     }),
@@ -3092,8 +3109,8 @@ it("allows manually checking updates and opens the release page when an update i
     return {
       ok: true,
       json: async () => ({
-        tag_name: "v0.2.0",
-        html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
+        tag_name: "v9.9.9",
+        html_url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v9.9.9",
         published_at: "2026-05-29T12:00:00Z",
         body: "更新说明",
       }),
@@ -3116,7 +3133,7 @@ it("allows manually checking updates and opens the release page when an update i
     expect(requestCount).toBeGreaterThanOrEqual(2);
   });
   expect(openExternalSpy).toHaveBeenCalledWith({
-    url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v0.2.0",
+    url: "https://github.com/caiweiming/ai-session-manager/releases/tag/v9.9.9",
   });
 });
 

@@ -61,6 +61,7 @@ export function Sidebar({
     currentVersion: string;
     terminalOptions: TerminalOption[];
     supportsResumeInTerminal: boolean;
+    isElevated?: boolean;
     onThemeChange: (theme: "light" | "dark" | "system") => void;
     onScanSourceToggle: (source: "codex" | "claude" | "gemini", enabled: boolean) => void;
     onHardDeleteChange: (enabled: boolean) => void;
@@ -100,6 +101,7 @@ export function Sidebar({
     currentVersion,
     terminalOptions,
     supportsResumeInTerminal,
+    isElevated = false,
     onThemeChange,
     onScanSourceToggle,
     onHardDeleteChange,
@@ -525,6 +527,7 @@ export function Sidebar({
         aboutUpdate={open ? update : undefined}
         terminalOptions={terminalOptions}
         supportsResumeInTerminal={supportsResumeInTerminal}
+        isElevated={isElevated}
         onThemeChange={onThemeChange}
         onScanSourceToggle={onScanSourceToggle}
         onHardDeleteChange={onHardDeleteChange}

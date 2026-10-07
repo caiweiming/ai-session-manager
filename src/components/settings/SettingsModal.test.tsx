@@ -446,6 +446,31 @@ it("shows a notice and disables terminal selection when resume in terminal is un
   expect(screen.getByLabelText("terminal-preference-select")).toBeDisabled();
 });
 
+it("shows the elevated Codex recovery notice on Windows", () => {
+  render(
+    <SettingsModal
+      open={true}
+      onClose={() => {}}
+      settings={{
+        themeMode: "system",
+        hardDelete: false,
+        terminalPreference: "auto",
+        scanSources: { codex: true, claude: true, gemini: true },
+      }}
+      onThemeChange={() => {}}
+      onScanSourceToggle={() => {}}
+      onHardDeleteChange={() => {}}
+      onTerminalPreferenceChange={() => {}}
+      terminalOptions={[{ id: "auto", label: "自动（推荐）" }]}
+      supportsResumeInTerminal={true}
+      isElevated={true}
+    />,
+  );
+
+  expect(screen.getByText("当前应用以管理员权限运行，Codex 恢复将使用无 daemon 模式。"))
+    .toBeInTheDocument();
+});
+
 it("shows about information with current version and release links", () => {
   const onCheckNow = vi.fn();
   const onOpenReleasePage = vi.fn();

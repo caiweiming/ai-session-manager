@@ -28,6 +28,7 @@ type UseSessionMutationControllerProps = {
   viewMode: SidebarViewMode;
   terminalPreference: string;
   supportsResumeInTerminal: boolean;
+  codexResumeUsesNoDaemon?: boolean;
   onAfterMutation: () => void;
   onClearTrashStart?: () => void;
   onClearTrashFinish?: () => void;
@@ -65,6 +66,7 @@ export function useSessionMutationController({
   viewMode,
   terminalPreference,
   supportsResumeInTerminal,
+  codexResumeUsesNoDaemon = false,
   onAfterMutation,
   onClearTrashStart,
   onClearTrashFinish,
@@ -230,5 +232,6 @@ export function useSessionMutationController({
     handleResumeSession,
     handleExportSession,
     supportsResumeInTerminal,
+    codexResumeUsesNoDaemon,
   };
 }

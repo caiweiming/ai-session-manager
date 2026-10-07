@@ -121,7 +121,11 @@ export const copyPlainText = async (text: string) => {
   }
 };
 
-export const buildResumeCommand = (sourceTool?: string, sourceId?: string) => {
+export const buildResumeCommand = (
+  sourceTool?: string,
+  sourceId?: string,
+  codexResumeUsesNoDaemon = false,
+) => {
   if (!sourceTool || !sourceId) return "--";
   const tool = sourceTool.trim().toLowerCase();
   const id = sourceId.trim();
@@ -134,7 +138,7 @@ export const buildResumeCommand = (sourceTool?: string, sourceId?: string) => {
     return `gemini --resume ${id}`;
   }
   if (tool === "codex") {
-    return `codex resume ${id}`;
+    return `codex${codexResumeUsesNoDaemon ? " --no-daemon" : ""} resume ${id}`;
   }
   return `${tool} resume ${id}`;
 };

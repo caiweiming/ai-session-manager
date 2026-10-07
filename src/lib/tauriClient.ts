@@ -92,6 +92,7 @@ export type PlatformCapabilities = {
   supportsRevealPath: boolean;
   supportsResumeInTerminal: boolean;
   revealPathDegradesToOpenParent: boolean;
+  isElevated?: boolean;
 };
 
 export type AppSettings = {
@@ -375,6 +376,7 @@ export const api = {
         supportsRevealPath: true,
         supportsResumeInTerminal: false,
         revealPathDegradesToOpenParent: false,
+        isElevated: false,
       },
     });
   },

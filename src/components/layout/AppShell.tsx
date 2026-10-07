@@ -22,6 +22,16 @@ type TrashClearProgressState = {
   totalSessions: number;
 };
 
+const ELEVATED_RECOVERY_NOTICE_KEY = "ai-session-manager.elevated-recovery-notice-dismissed";
+
+const hasDismissedElevatedRecoveryNotice = () => {
+  try {
+    return window.localStorage.getItem(ELEVATED_RECOVERY_NOTICE_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
 export function AppShell() {
   const { leftWidth, rightWidth, setLeftWidth } = useResizablePanels();
   const [scanFailuresOpen, setScanFailuresOpen] = useState(false);
@@ -30,6 +40,9 @@ export function AppShell() {
   const [currentVersion, setCurrentVersion] = useState(packageJson.version);
   const [trashClearInFlight, setTrashClearInFlight] = useState(false);
   const [trashClearProgress, setTrashClearProgress] = useState<TrashClearProgressState | null>(null);
+  const [elevatedRecoveryNoticeDismissed, setElevatedRecoveryNoticeDismissed] = useState(
+    hasDismissedElevatedRecoveryNotice,
+  );
   const { appSettings, platformCapabilities, settingsReady, loadSettings, patchAppSettings } = useAppSettingsController();
   const {
     workspaceReady,
@@ -148,6 +161,8 @@ export function AppShell() {
     viewMode,
     terminalPreference: appSettings.terminalPreference,
     supportsResumeInTerminal: platformCapabilities.supportsResumeInTerminal,
+    codexResumeUsesNoDaemon:
+      platformCapabilities.os === "windows" && platformCapabilities.isElevated === true,
     onAfterMutation: handleAfterMutation,
     onClearTrashStart: () => {
       setTrashClearInFlight(true);
@@ -164,6 +179,7 @@ export function AppShell() {
     currentVersion,
     terminalOptions: platformCapabilities.terminalOptions,
     supportsResumeInTerminal: platformCapabilities.supportsResumeInTerminal,
+    isElevated: platformCapabilities.isElevated === true,
     onThemeChange: (theme: "light" | "dark" | "system") => {
       void patchAppSettings({ themeMode: theme });
     },
@@ -181,6 +197,15 @@ export function AppShell() {
     onTerminalPreferenceChange: (preference: string) => {
       void patchAppSettings({ terminalPreference: preference });
     },
+  };
+
+  const dismissElevatedRecoveryNotice = () => {
+    setElevatedRecoveryNoticeDismissed(true);
+    try {
+      window.localStorage.setItem(ELEVATED_RECOVERY_NOTICE_KEY, "1");
+    } catch {
+      // 本地存储不可用时仍允许当前窗口关闭提示。
+    }
   };
 
   const bootstrap = {
@@ -300,6 +325,17 @@ export function AppShell() {
       className="app-shell"
       style={{ gridTemplateColumns: `${leftWidth}px minmax(0, 1fr)` }}
     >
+      {platformCapabilities.isElevated === true && !elevatedRecoveryNoticeDismissed ? (
+        <div className="runtime-notice" data-testid="elevated-recovery-notice" role="status" aria-live="polite">
+          <div className="runtime-notice-copy">
+            <strong>管理员运行上下文</strong>
+            <span>Codex 恢复将自动使用无 daemon 模式。</span>
+          </div>
+          <button type="button" className="runtime-notice-dismiss" onClick={dismissElevatedRecoveryNotice}>
+            知道了
+          </button>
+        </div>
+      ) : null}
       {scanInFlight ? (
         <div className="main-scan-status" data-testid="main-scan-status" role="status" aria-live="polite">
           <div className="main-scan-status-card">

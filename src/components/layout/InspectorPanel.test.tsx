@@ -32,11 +32,13 @@ const buildMutation = (overrides?: Partial<{
   handleExportSession: (payload: { sourceTool: string; sourceId: string; includeSubagent?: boolean }) => Promise<{ path: string; canceled: boolean }>;
   handleResumeSession: (payload: { sourceTool: string; sourceId: string; workspacePath: string }) => Promise<void>;
   supportsResumeInTerminal: boolean;
+  codexResumeUsesNoDaemon?: boolean;
 }>) => ({
   handleDeleteSession: vi.fn(async () => true),
   handleExportSession: vi.fn(async () => defaultExportResult),
   handleResumeSession: vi.fn(async () => {}),
   supportsResumeInTerminal: true,
+  codexResumeUsesNoDaemon: false,
   ...overrides,
 });
 
@@ -261,6 +263,18 @@ it("copies resume command and shows success feedback", async () => {
     expect(writeText).toHaveBeenCalledWith(`codex resume ${defaultSessionDetail.sourceId}`);
   });
   expect(screen.getByLabelText("copy-resume-command")).toHaveClass("success");
+});
+
+it("shows the no-daemon Codex command in an elevated Windows context", () => {
+  render(
+    <InspectorPanel
+      panelWidth={360}
+      detailPanel={buildDetailPanel()}
+      mutation={buildMutation({ codexResumeUsesNoDaemon: true })}
+    />,
+  );
+
+  expect(screen.getByText(`codex --no-daemon resume ${defaultSessionDetail.sourceId}`)).toBeInTheDocument();
 });
 
 it("shows resume action beside resume command for main sessions", () => {

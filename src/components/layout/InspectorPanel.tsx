@@ -131,12 +131,22 @@ export function InspectorPanel({
   };
   mutation: Pick<
     ReturnType<typeof useSessionMutationController>,
-    "handleDeleteSession" | "handleExportSession" | "handleResumeSession" | "supportsResumeInTerminal"
+    | "handleDeleteSession"
+    | "handleExportSession"
+    | "handleResumeSession"
+    | "supportsResumeInTerminal"
+    | "codexResumeUsesNoDaemon"
   >;
 }) {
   const { open, onClose, detail, detailLoading, activeSession = null, subagentRows, subagentsLoading, onLoadMoreMessages } =
     detailPanel;
-  const { handleDeleteSession, handleExportSession, handleResumeSession, supportsResumeInTerminal } = mutation;
+  const {
+    handleDeleteSession,
+    handleExportSession,
+    handleResumeSession,
+    supportsResumeInTerminal,
+    codexResumeUsesNoDaemon,
+  } = mutation;
   const detailMatchesActiveSession =
     !activeSession ||
     (detail?.sourceTool === activeSession.sourceTool && detail.sourceId === activeSession.sourceId);
@@ -162,7 +172,7 @@ export function InspectorPanel({
   const toolLabel = detail?.sourceTool ? `${formatToolName(detail.sourceTool)} 会话记录` : "未选择会话";
   const toolLogoSrc = getToolLogoSrc(detail?.sourceTool);
   const sessionKindLabel = detail ? (detail.isSubagent ? "子代理" : "主会话") : "--";
-  const resumeCommand = buildResumeCommand(detail?.sourceTool, detail?.sourceId);
+  const resumeCommand = buildResumeCommand(detail?.sourceTool, detail?.sourceId, codexResumeUsesNoDaemon);
   const messages = (detail?.messages || []).map((message) => ({
     role: normalizeRole(message.role),
     content: message.content,

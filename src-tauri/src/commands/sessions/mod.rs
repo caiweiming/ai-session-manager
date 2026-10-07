@@ -246,6 +246,7 @@ pub fn get_platform_capabilities() -> CommandResult<PlatformCapabilitiesResponse
         supports_reveal_path: capabilities.supports_reveal_path,
         supports_resume_in_terminal: capabilities.supports_resume_in_terminal,
         reveal_path_degrades_to_open_parent: capabilities.reveal_path_degrades_to_open_parent,
+        is_elevated: capabilities.is_elevated,
     })
 }
 

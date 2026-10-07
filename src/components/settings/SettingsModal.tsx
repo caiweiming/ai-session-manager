@@ -34,6 +34,7 @@ export function SettingsModal({
   aboutUpdate,
   terminalOptions,
   supportsResumeInTerminal,
+  isElevated = false,
   onThemeChange,
   onScanSourceToggle,
   onHardDeleteChange,
@@ -46,6 +47,7 @@ export function SettingsModal({
   aboutUpdate?: AboutUpdate;
   terminalOptions: TerminalOption[];
   supportsResumeInTerminal: boolean;
+  isElevated?: boolean;
   onThemeChange: (theme: "light" | "dark" | "system") => void;
   onScanSourceToggle: (source: "codex" | "claude" | "gemini", enabled: boolean) => void;
   onHardDeleteChange: (enabled: boolean) => void;
@@ -329,6 +331,16 @@ export function SettingsModal({
                   className="settings-custom-select"
                 />
               </div>
+              {isElevated ? (
+                <div className="settings-row settings-row-warning" role="status" aria-live="polite">
+                  <div className="settings-label">
+                    <span className="settings-name">管理员运行上下文</span>
+                    <span className="settings-desc">
+                      当前应用以管理员权限运行，Codex 恢复将使用无 daemon 模式。
+                    </span>
+                  </div>
+                </div>
+              ) : null}
             </section>
 
             <section

@@ -126,6 +126,7 @@ fn capabilities_with_detector(
         supports_reveal_path: true,
         supports_resume_in_terminal: true,
         reveal_path_degrades_to_open_parent: true,
+        is_elevated: false,
     }
 }
 

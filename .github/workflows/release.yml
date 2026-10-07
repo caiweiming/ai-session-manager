@@ -49,6 +49,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - run: pnpm test
+
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
+
       - run: node --test scripts/release-assets.test.mjs
 
       - run: pnpm run ${{ matrix.script }}

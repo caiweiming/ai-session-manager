@@ -34,6 +34,7 @@ export const defaultPlatformCapabilities: PlatformCapabilities = {
   supportsRevealPath: true,
   supportsResumeInTerminal: true,
   revealPathDegradesToOpenParent: false,
+  isElevated: false,
 };
 
 export const defaultOverviewSummary: OverviewSummary = {

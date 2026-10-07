@@ -861,6 +861,64 @@ body {
   position: relative;
 }
 
+.runtime-notice {
+  position: fixed;
+  top: 16px;
+  right: 18px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: min(420px, calc(100vw - 36px));
+  padding: 12px 14px;
+  border: 1px solid rgba(217, 119, 6, 0.28);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  color: var(--text-main);
+}
+
+.runtime-notice-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.runtime-notice-copy strong {
+  color: #b45309;
+  font-size: 13px;
+}
+
+.runtime-notice-copy span {
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.runtime-notice-dismiss {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 0;
+}
+
+.runtime-notice-dismiss:hover {
+  color: var(--accent);
+}
+
+.settings-row-warning {
+  border-top: 1px solid rgba(217, 119, 6, 0.18);
+}
+
+.settings-row-warning .settings-name {
+  color: #b45309;
+}
+
 .main-scan-status {
   position: absolute;
   inset: 0;

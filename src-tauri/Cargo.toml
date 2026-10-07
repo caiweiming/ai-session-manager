@@ -1,6 +1,6 @@
 [package]
 name = "ai-session-manager"
-version = "0.2.0"
+version = "0.2.1"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -39,6 +39,13 @@ debug = 0
 
 [profile.test]
 debug = 0
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_Threading",
+] }
 
 [patch.crates-io]
 wry = { path = "../vendor/wry-0.54.4" }

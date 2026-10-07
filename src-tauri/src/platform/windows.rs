@@ -9,7 +9,7 @@ use super::{
 };
 
 pub fn capabilities() -> PlatformCapabilities {
-    capabilities_with_detector(terminal_candidate_available)
+    capabilities_with_detector(terminal_candidate_available, is_process_elevated())
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -86,6 +86,7 @@ fn terminal_candidates() -> &'static [TerminalCandidate] {
 
 fn capabilities_with_detector(
     is_available: impl Fn(&TerminalCandidate) -> bool,
+    is_elevated: bool,
 ) -> PlatformCapabilities {
     let mut terminal_options = vec![TerminalOption {
         id: "auto".to_string(),
@@ -107,6 +108,36 @@ fn capabilities_with_detector(
         supports_reveal_path: true,
         supports_resume_in_terminal: true,
         reveal_path_degrades_to_open_parent: false,
+        is_elevated,
+    }
+}
+
+fn is_process_elevated() -> bool {
+    use std::ffi::c_void;
+    use std::mem::size_of;
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::Security::{
+        GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY,
+    };
+    use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+
+    unsafe {
+        let mut token = std::ptr::null_mut();
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) == 0 {
+            return false;
+        }
+
+        let mut elevation = TOKEN_ELEVATION { TokenIsElevated: 0 };
+        let mut return_length = 0;
+        let result = GetTokenInformation(
+            token,
+            TokenElevation,
+            &mut elevation as *mut TOKEN_ELEVATION as *mut c_void,
+            size_of::<TOKEN_ELEVATION>() as u32,
+            &mut return_length,
+        );
+        CloseHandle(token);
+        result != 0 && elevation.TokenIsElevated != 0
     }
 }
 
@@ -249,7 +280,12 @@ fn resolve_cli_for_tool(source_tool: &str) -> String {
 }
 
 #[cfg(target_os = "windows")]
-fn build_powershell_resume_command(source_tool: &str, cli_path: &str, source_id: &str) -> String {
+fn build_powershell_resume_command(
+    source_tool: &str,
+    cli_path: &str,
+    source_id: &str,
+    use_no_daemon: bool,
+) -> String {
     if source_tool == "claude" || source_tool == "gemini" {
         format!(
             "{} --resume {}",
@@ -257,16 +293,23 @@ fn build_powershell_resume_command(source_tool: &str, cli_path: &str, source_id:
             ps_single_quote(source_id)
         )
     } else {
+        let daemon_flag = if use_no_daemon { " --no-daemon" } else { "" };
         format!(
-            "{} resume {}",
+            "{}{} resume {}",
             ps_single_quote(cli_path),
+            daemon_flag,
             ps_single_quote(source_id)
         )
     }
 }
 
 #[cfg(target_os = "windows")]
-fn build_cmd_resume_command(source_tool: &str, cli_path: &str, source_id: &str) -> String {
+fn build_cmd_resume_command(
+    source_tool: &str,
+    cli_path: &str,
+    source_id: &str,
+    use_no_daemon: bool,
+) -> String {
     if source_tool == "claude" || source_tool == "gemini" {
         format!(
             "{} --resume {}",
@@ -274,9 +317,11 @@ fn build_cmd_resume_command(source_tool: &str, cli_path: &str, source_id: &str) 
             cmd_double_quote(source_id)
         )
     } else {
+        let daemon_flag = if use_no_daemon { " --no-daemon" } else { "" };
         format!(
-            "{} resume {}",
+            "{}{} resume {}",
             cmd_double_quote(cli_path),
+            daemon_flag,
             cmd_double_quote(source_id)
         )
     }
@@ -288,7 +333,12 @@ fn sh_single_quote(value: &str) -> String {
 }
 
 #[cfg(target_os = "windows")]
-fn build_bash_resume_command(source_tool: &str, cli_path: &str, source_id: &str) -> String {
+fn build_bash_resume_command(
+    source_tool: &str,
+    cli_path: &str,
+    source_id: &str,
+    use_no_daemon: bool,
+) -> String {
     let cli = cli_path.replace('\\', "/");
     if source_tool == "claude" || source_tool == "gemini" {
         format!(
@@ -297,9 +347,11 @@ fn build_bash_resume_command(source_tool: &str, cli_path: &str, source_id: &str)
             sh_single_quote(source_id)
         )
     } else {
+        let daemon_flag = if use_no_daemon { " --no-daemon" } else { "" };
         format!(
-            "{} resume {}",
+            "{}{} resume {}",
             sh_single_quote(&cli),
+            daemon_flag,
             sh_single_quote(source_id)
         )
     }
@@ -318,7 +370,9 @@ pub fn resume_in_terminal(
     } = payload;
     let workspace_path_string = workspace_path.to_string_lossy().to_string();
     let cli_path = resolve_cli_for_tool(&source_tool);
-    let resume_command = build_powershell_resume_command(&source_tool, &cli_path, &source_id);
+    let use_no_daemon = source_tool == "codex" && is_process_elevated();
+    let resume_command =
+        build_powershell_resume_command(&source_tool, &cli_path, &source_id, use_no_daemon);
     let terminal_preference =
         validate_terminal_preference(terminal_preference, &allowed_terminal_preferences())?;
     let script = format!(
@@ -326,13 +380,13 @@ pub fn resume_in_terminal(
         ps_single_quote(&workspace_path_string),
         resume_command
     );
-    let cmd_resume = build_cmd_resume_command(&source_tool, &cli_path, &source_id);
+    let cmd_resume = build_cmd_resume_command(&source_tool, &cli_path, &source_id, use_no_daemon);
     let cmd_chain = format!(
         "cd /d {} && {}",
         cmd_double_quote(&workspace_path_string),
         cmd_resume
     );
-    let bash_resume = build_bash_resume_command(&source_tool, &cli_path, &source_id);
+    let bash_resume = build_bash_resume_command(&source_tool, &cli_path, &source_id, use_no_daemon);
     let bash_chain = format!(
         "cd {} && {}; exec bash -i",
         sh_single_quote(&workspace_path_string.replace('\\', "/")),
@@ -638,12 +692,15 @@ mod tests {
 
     #[test]
     fn capabilities_should_expose_only_detected_windows_terminals() {
-        let capabilities = capabilities_with_detector(|candidate| {
-            matches!(
-                candidate.id,
-                "windows_terminal" | "pwsh" | "git_bash" | "cmd"
-            )
-        });
+        let capabilities = capabilities_with_detector(
+            |candidate| {
+                matches!(
+                    candidate.id,
+                    "windows_terminal" | "pwsh" | "git_bash" | "cmd"
+                )
+            },
+            false,
+        );
         let ids = capabilities
             .terminal_options
             .iter()
@@ -674,5 +731,37 @@ mod tests {
         .expect_err("invalid preference should error before spawning");
 
         assert_eq!(err.to_string(), "unsupported terminal preference: bogus");
+    }
+
+    #[test]
+    fn elevated_codex_resume_commands_should_disable_daemon_for_each_shell() {
+        assert_eq!(
+            build_powershell_resume_command("codex", "codex", "session-1", true),
+            "'codex' --no-daemon resume 'session-1'"
+        );
+        assert_eq!(
+            build_cmd_resume_command("codex", "codex", "session-1", true),
+            "\"codex\" --no-daemon resume \"session-1\""
+        );
+        assert_eq!(
+            build_bash_resume_command("codex", "codex", "session-1", true),
+            "'codex' --no-daemon resume 'session-1'"
+        );
+    }
+
+    #[test]
+    fn elevated_non_codex_resume_commands_should_keep_their_native_arguments() {
+        assert_eq!(
+            build_powershell_resume_command("claude", "claude", "session-1", true),
+            "'claude' --resume 'session-1'"
+        );
+        assert_eq!(
+            build_cmd_resume_command("gemini", "gemini", "session-1", true),
+            "\"gemini\" --resume \"session-1\""
+        );
+        assert_eq!(
+            build_bash_resume_command("codex", "codex", "session-1", false),
+            "'codex' resume 'session-1'"
+        );
     }
 }

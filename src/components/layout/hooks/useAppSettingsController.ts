@@ -18,6 +18,7 @@ const DEFAULT_PLATFORM_CAPABILITIES: PlatformCapabilities = {
   supportsRevealPath: true,
   supportsResumeInTerminal: false,
   revealPathDegradesToOpenParent: false,
+  isElevated: false,
 };
 
 const normalizeScanSources = (settings: AppSettings) => ({
@@ -34,7 +35,8 @@ const isPlatformCapabilities = (value: unknown): value is PlatformCapabilities =
     Array.isArray(candidate.terminalOptions) &&
     typeof candidate.supportsRevealPath === "boolean" &&
     typeof candidate.supportsResumeInTerminal === "boolean" &&
-    typeof candidate.revealPathDegradesToOpenParent === "boolean"
+    typeof candidate.revealPathDegradesToOpenParent === "boolean" &&
+    (candidate.isElevated === undefined || typeof candidate.isElevated === "boolean")
   );
 };
 
