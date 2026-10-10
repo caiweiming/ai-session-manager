@@ -462,7 +462,7 @@ mod tests {
             Duration::from_millis(10),
             |path| async move {
                 if path == "slow" {
-                    tokio::time::sleep(Duration::from_millis(50)).await;
+                    std::future::pending::<()>().await;
                 }
                 result(path, WorkspacePathStatus::Available, None)
             },
