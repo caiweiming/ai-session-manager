@@ -517,6 +517,48 @@ it("shows a sticky group row for the current expanded directory group", async ()
   expect(stickyGroup).toHaveTextContent("18 个会话");
 });
 
+it("shows the same directory status in the regular and sticky group without repeating it on session rows", async () => {
+  Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+    configurable: true,
+    get() {
+      return this.getAttribute("data-testid") === "session-table-viewport"
+        ? 220
+        : 220;
+    },
+  });
+
+  const workspaceKey = "d:\\works\\sticky-status";
+  const rows = Array.from({ length: 18 }, (_, index) => ({
+    id: `codex:status-${index + 1}`,
+    title: `状态会话 ${index + 1}`,
+    tool: "codex",
+    path: "D:\\Works\\sticky-status",
+    workspaceKey,
+    sourceTool: "codex",
+    sourceId: `status-${index + 1}`,
+  }));
+
+  render(
+    <SessionTable
+      rows={rows}
+      workspaceStatuses={{
+        [workspaceKey]: { status: "unavailable", reason: "timeout" },
+      }}
+    />,
+  );
+
+  expect(screen.getAllByRole("img", { name: "检查超时" })).toHaveLength(1);
+  fireEvent.click(screen.getByLabelText(/^toggle-group-/));
+  expect(screen.getAllByRole("img", { name: "检查超时" })).toHaveLength(1);
+
+  const viewport = screen.getByTestId("session-table-viewport");
+  fireEvent.scroll(viewport, { target: { scrollTop: 130 } });
+
+  const stickyGroup = await within(viewport).findByTestId("session-table-sticky-group");
+  expect(within(stickyGroup).getByRole("img", { name: "检查超时" })).toBeInTheDocument();
+  expect(screen.getAllByRole("img", { name: "检查超时" })).toHaveLength(2);
+});
+
 it("hides the original directory row while the same sticky group is active", async () => {
   Object.defineProperty(HTMLElement.prototype, "clientHeight", {
     configurable: true,

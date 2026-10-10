@@ -1,9 +1,123 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import {
+  DirectoryStatusIndicator,
   SessionTableDataRow,
   SessionTableGroupRow,
+  SessionTableStickyGroupRow,
 } from "./SessionTableParts";
+import { normalizeWorkspacePath } from "../../lib/workspaceStatus";
 import { normalizeSessionTableRows, sortSessionGroups } from "./sessionTableUtils";
+
+it.each([
+  [{ status: "missing" as const }, "目录不存在"],
+  [{ status: "unavailable" as const, reason: "permission_denied" as const }, "没有访问权限"],
+  [{ status: "unknown" as const, reason: "missing_workspace_path" as const }, "目录状态未知：会话未记录工作目录"],
+  [{ status: "checking" as const }, "正在检查目录状态"],
+  [{ status: "unchecked" as const }, "目录状态未检查"],
+])("renders a focusable non-button directory status indicator for %s", (info, label) => {
+  render(<DirectoryStatusIndicator info={info} />);
+
+  const indicator = screen.getByRole("img", { name: label });
+  expect(indicator).toHaveAttribute("title", label);
+  expect(indicator).toHaveAttribute("tabindex", "0");
+  expect(indicator).toHaveClass("directory-status-indicator", `directory-status-${info.status}`);
+  expect(indicator.tagName).toBe("SPAN");
+  expect(indicator.querySelector(".directory-status-tooltip")).toHaveClass("directory-status-tooltip-above");
+  expect(indicator.querySelector(".directory-status-tooltip")).toHaveTextContent(label);
+  expect(screen.queryByRole("button", { name: label })).not.toBeInTheDocument();
+});
+
+it("places the sticky group tooltip below the pinned row", () => {
+  const path = "D:\\Works\\sticky-tooltip";
+  const workspaceKey = normalizeWorkspacePath(path).key;
+  const rows = normalizeSessionTableRows([
+    { id: "sticky-tooltip", title: "吸顶提示", tool: "codex", path, workspaceKey },
+  ]);
+  const group = sortSessionGroups(rows, [], "default", {
+    [workspaceKey]: { status: "missing" },
+  })[0];
+
+  render(
+    <SessionTableStickyGroupRow
+      group={group}
+      onToggleExpanded={vi.fn()}
+      onOpenGroupPath={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByLabelText("目录不存在").querySelector(".directory-status-tooltip"))
+    .toHaveClass("directory-status-tooltip-below");
+});
+
+it("does not render a directory status indicator for an available directory", () => {
+  const { container } = render(<DirectoryStatusIndicator info={{ status: "available" }} />);
+
+  expect(container).toBeEmptyDOMElement();
+  expect(screen.queryByRole("img")).not.toBeInTheDocument();
+});
+
+it("places the directory status indicator after the group path text", () => {
+  const rows = normalizeSessionTableRows([
+    {
+      id: "status-order",
+      title: "状态顺序",
+      tool: "codex",
+      path: "D:\\Works\\status-order",
+      workspaceKey: "d:\\works\\status-order",
+    },
+  ]);
+  const group = sortSessionGroups(rows, [], "default", {
+    "d:\\works\\status-order": { status: "missing" },
+  })[0];
+
+  render(
+    <div role="table">
+      <SessionTableGroupRow
+        group={group}
+        expanded={false}
+        groupSelected={false}
+        highlightKeyword=""
+        onToggleRows={() => undefined}
+        onToggleExpanded={() => undefined}
+        onOpenGroupPath={() => undefined}
+      />
+    </div>,
+  );
+
+  const groupPathMain = document.querySelector(".group-path-main");
+  expect(groupPathMain?.children[0]).toHaveClass("group-path-text");
+  expect(groupPathMain?.children[1]).toHaveClass("directory-status-indicator");
+});
+
+it("keeps a real directory named like the legacy unknown label actionable", () => {
+  const path = "未知路径";
+  const rows = normalizeSessionTableRows([
+    {
+      id: "real-legacy-label",
+      title: "真实目录",
+      tool: "codex",
+      path,
+      workspaceKey: normalizeWorkspacePath(path).key,
+    },
+  ]);
+  const group = sortSessionGroups(rows, [], "default", {
+    [normalizeWorkspacePath(path).key]: { status: "available" },
+  })[0];
+
+  render(
+    <SessionTableGroupRow
+      group={group}
+      expanded={false}
+      groupSelected={false}
+      highlightKeyword=""
+      onToggleRows={vi.fn()}
+      onToggleExpanded={vi.fn()}
+      onOpenGroupPath={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByLabelText(`open-group-path-${path}`)).toBeEnabled();
+});
 
 it("renders group and session rows with action handlers in the virtual row layout", () => {
   const normalizedRows = normalizeSessionTableRows([

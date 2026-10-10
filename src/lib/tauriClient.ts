@@ -117,6 +117,27 @@ export type TrashClearProgress = {
   totalSessions: number;
 };
 
+export type WorkspacePathStatusReason =
+  | "permission_denied"
+  | "not_directory"
+  | "timeout"
+  | "storage_unavailable"
+  | "io_error";
+
+export type WorkspacePathStatusResult = {
+  path: string;
+  status: "available" | "missing" | "unavailable";
+  reason?: WorkspacePathStatusReason;
+};
+
+export type CheckWorkspacePathsPayload = {
+  paths: string[];
+};
+
+export type CheckWorkspacePathsResponse = {
+  results: WorkspacePathStatusResult[];
+};
+
 type UpdateAppSettingsPayload = {
   themeMode?: "light" | "dark" | "system";
   hardDelete?: boolean;
@@ -135,6 +156,10 @@ type ListSessionsPayload = {
   updatedWithinDays?: number;
   page: number;
   pageSize: number;
+};
+
+type ListSessionsResponse = {
+  rows: SessionRow[];
 };
 
 type GetSessionDetailPayload = {
@@ -326,12 +351,23 @@ export const api = {
     });
   },
   listSessions: async (payload: ListSessionsPayload) => {
-    return invokeWithTauriFallback({
+    return invokeWithTauriFallback<ListSessionsResponse, { payload: ListSessionsPayload }>({
       command: "list_sessions",
       args: { payload },
       fallback: { rows: [] },
     });
   },
+  checkWorkspacePaths: async (payload: CheckWorkspacePathsPayload): Promise<CheckWorkspacePathsResponse> =>
+    invokeWithTauriFallback({
+      command: "check_workspace_paths",
+      args: { payload },
+      fallback: (args) => ({
+        results: (args?.payload.paths ?? []).map((path) => ({
+          path,
+          status: "available" as const,
+        })),
+      }),
+    }),
   getOverviewSummary: async () => {
     return invokeWithTauriFallback({
       command: "get_overview_summary",
@@ -346,7 +382,7 @@ export const api = {
     });
   },
   listTrashSessions: async (payload: ListSessionsPayload) => {
-    return invokeWithTauriFallback({
+    return invokeWithTauriFallback<ListSessionsResponse, { payload: ListSessionsPayload }>({
       command: "list_trash_sessions",
       args: { payload },
       fallback: { rows: [] },

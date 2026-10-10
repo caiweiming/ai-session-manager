@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { api, type SessionMutationResult } from "../../../lib/tauriClient";
+import { UNKNOWN_WORKSPACE_DISPLAY } from "../../../lib/workspaceStatus";
 import type { SidebarViewMode } from "../Sidebar";
 
 type DeleteSessionOptions = {
@@ -36,7 +37,9 @@ type UseSessionMutationControllerProps = {
 
 const isOpenableWorkspacePath = (path: string) => {
   const trimmed = path.trim();
-  return trimmed.length > 0 && trimmed !== "未知路径";
+  return trimmed.length > 0
+    && trimmed !== UNKNOWN_WORKSPACE_DISPLAY
+    && trimmed !== "未知路径";
 };
 
 const shouldRefreshAfterMutation = (result: SessionMutationResult) => {

@@ -231,6 +231,7 @@ it("handleOpenWorkspacePath 对未知路径静默跳过", async () => {
 
   await act(async () => {
     await result.current.handleOpenWorkspacePath("未知路径");
+    await result.current.handleOpenWorkspacePath("未知目录");
     await result.current.handleOpenWorkspacePath("   ");
   });
 

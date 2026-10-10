@@ -1,5 +1,10 @@
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { getToolLogoSrc } from "../../lib/toolDisplay";
+import {
+  getDirectoryStatusLabel,
+  UNKNOWN_WORKSPACE_KEY,
+  type DirectoryStatusInfo,
+} from "../../lib/workspaceStatus";
 import type {
   NormalizedSessionRow,
   SessionGroup,
@@ -53,6 +58,73 @@ const MultiSourceLogo = () => (
     <path d="M6.2 7.2 9.6 5.8M6.2 8.8 9.6 10.2" stroke="currentColor" strokeOpacity="0.66" strokeWidth="1.1" strokeLinecap="round" />
   </svg>
 );
+
+export const DirectoryStatusIndicator = ({
+  info,
+  tooltipPlacement = "above",
+}: {
+  info: DirectoryStatusInfo;
+  tooltipPlacement?: "above" | "below";
+}) => {
+  if (info.status === "available") return null;
+
+  const label = getDirectoryStatusLabel(info);
+  let icon;
+  if (info.status === "missing") {
+    icon = (
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M1.8 4.2h4l1.3 1.5h7.1v6.8a1.2 1.2 0 0 1-1.2 1.2H3a1.2 1.2 0 0 1-1.2-1.2z" />
+        <path d="m5.7 8 4.6 4.6m0-4.6-4.6 4.6" />
+      </svg>
+    );
+  } else if (info.status === "unavailable") {
+    icon = (
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M8 1.8 14.4 13H1.6z" />
+        <path d="M8 5.5v3.6m0 2.2h.01" />
+      </svg>
+    );
+  } else if (info.status === "unknown") {
+    icon = (
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.2" />
+        <path d="M6.3 6.1A1.8 1.8 0 0 1 8 4.9c1.1 0 1.9.7 1.9 1.7 0 1.2-1.1 1.5-1.7 2.2-.3.3-.3.6-.3 1M8 12h.01" />
+      </svg>
+    );
+  } else if (info.status === "checking") {
+    icon = (
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+        <circle cx="8" cy="8" r="6" opacity="0.3" />
+        <path d="M8 2a6 6 0 0 1 6 6" />
+      </svg>
+    );
+  } else {
+    icon = (
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.2" />
+        <path d="m3.6 3.6 8.8 8.8" />
+      </svg>
+    );
+  }
+
+  return (
+    <span
+      className={`directory-status-indicator directory-status-${info.status}`}
+      role="img"
+      tabIndex={0}
+      aria-label={label}
+      title={label}
+    >
+      {icon}
+      <span
+        className={`directory-status-tooltip directory-status-tooltip-${tooltipPlacement}`}
+        aria-hidden="true"
+      >
+        {label}
+      </span>
+    </span>
+  );
+};
 
 const SessionActionButton = ({
   state,
@@ -197,13 +269,14 @@ export const SessionTableStickyGroupRow = ({
             <span className="group-path-text" title={group.displayPath}>
               {group.displayPath}
             </span>
+            <DirectoryStatusIndicator info={group.directoryStatus} tooltipPlacement="below" />
             <button
               type="button"
               className="group-path-open-btn sticky-group-open-btn"
               aria-label={`open-sticky-group-path-${group.displayPath}`}
               onClick={onOpenGroupPath}
               title="打开目录"
-              disabled={group.displayPath === "未知路径"}
+              disabled={group.workspaceKey === UNKNOWN_WORKSPACE_KEY}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M14 3h7v7" />
@@ -295,12 +368,13 @@ export const SessionTableGroupRow = ({
             <span className="group-path-text" title={group.displayPath}>
               {renderHighlightedText(group.displayPath, highlightKeyword)}
             </span>
+            <DirectoryStatusIndicator info={group.directoryStatus} />
             <button
               className="group-path-open-btn"
               aria-label={`open-group-path-${group.displayPath}`}
               onClick={onOpenGroupPath}
               title="打开目录"
-              disabled={group.displayPath === "未知路径"}
+              disabled={group.workspaceKey === UNKNOWN_WORKSPACE_KEY}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M14 3h7v7" />

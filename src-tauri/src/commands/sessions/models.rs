@@ -1,5 +1,43 @@
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CheckWorkspacePathsPayload {
+    pub paths: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkspacePathStatusResponse {
+    Available,
+    Missing,
+    Unavailable,
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkspacePathStatusReasonResponse {
+    PermissionDenied,
+    NotDirectory,
+    Timeout,
+    StorageUnavailable,
+    IoError,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspacePathCheckResultResponse {
+    pub path: String,
+    pub status: WorkspacePathStatusResponse,
+    pub reason: Option<WorkspacePathStatusReasonResponse>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckWorkspacePathsResponse {
+    pub results: Vec<WorkspacePathCheckResultResponse>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ListSessionsPayload {
     pub tool: Option<String>,
     pub workspace_path: Option<String>,

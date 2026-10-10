@@ -12,6 +12,7 @@ import {
   defaultSessionDetail,
   defaultSessionRows,
   defaultSubagentRows,
+  createAvailableWorkspacePathStatusResponse,
 } from "./tauriFixtures";
 
 export const invokeMock = vi.fn(async (cmd: string, args?: { payload?: { sourceTool?: string; sourceId?: string } }) => {
@@ -47,6 +48,10 @@ export const invokeMock = vi.fn(async (cmd: string, args?: { payload?: { sourceT
   if (cmd === "get_overview_summary") return defaultOverviewSummary;
   if (cmd === "refresh_sessions") return defaultRefreshSummary;
   if (cmd === "list_sessions") return { rows: defaultSessionRows };
+  if (cmd === "check_workspace_paths") {
+    const payload = args?.payload as { paths?: string[] } | undefined;
+    return createAvailableWorkspacePathStatusResponse(payload?.paths ?? []);
+  }
   if (cmd === "get_session_detail") {
     const sourceTool = args?.payload?.sourceTool ?? "codex";
     const sourceId = args?.payload?.sourceId ?? "session-1";

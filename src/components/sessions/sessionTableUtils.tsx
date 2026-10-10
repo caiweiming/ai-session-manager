@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import { normalizeWindowsDriveLetter } from "../../lib/pathDisplay";
 import { formatToolName, formatToolShortName } from "../../lib/toolDisplay";
+import {
+  normalizeWorkspacePath,
+  UNKNOWN_WORKSPACE_DISPLAY,
+  UNKNOWN_WORKSPACE_KEY,
+  type WorkspaceStatusMap,
+} from "../../lib/workspaceStatus";
 import type {
   NormalizedSessionRow,
   SessionGroup,
@@ -77,19 +83,7 @@ export const toWindowsLikePath = (raw: string) => {
 };
 
 export const normalizeGroupPath = (raw: string) => {
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    return { key: "unknown-path", display: "未知路径" };
-  }
-
-  const isWindowsLike = /^[A-Za-z]:[\\/]/.test(trimmed) || trimmed.includes("\\") || trimmed.startsWith("\\\\");
-  if (isWindowsLike) {
-    const display = toWindowsLikePath(trimmed);
-    return { key: display.toLowerCase(), display };
-  }
-
-  const display = trimmed.replace(/\/+$/, "");
-  return { key: display, display };
+  return normalizeWorkspacePath(raw);
 };
 
 export const normalizeSessionTableRows = (rows: SessionTableRow[]): NormalizedSessionRow[] => {
@@ -98,6 +92,13 @@ export const normalizeSessionTableRows = (rows: SessionTableRow[]): NormalizedSe
     const tool = fallbackText(row.tool, "unknown");
     const sourceTool = fallbackText(row.sourceTool, tool);
     const sourceId = fallbackText(row.sourceId, id);
+    const rawPath = typeof row.path === "string" ? row.path.trim() : "";
+    const explicitWorkspaceKey = typeof row.workspaceKey === "string" && row.workspaceKey.trim().length > 0;
+    const workspaceKey = explicitWorkspaceKey
+      ? row.workspaceKey as string
+      : !rawPath
+        ? UNKNOWN_WORKSPACE_KEY
+        : normalizeGroupPath(rawPath).key;
     return {
       id,
       title: fallbackText(row.title, `未命名会话 ${index + 1}`),
@@ -105,7 +106,8 @@ export const normalizeSessionTableRows = (rows: SessionTableRow[]): NormalizedSe
       toolLabel: formatToolName(tool),
       toolShortLabel: formatToolShortName(tool),
       toolClass: normalizeToolClass(tool),
-      path: fallbackText(row.path, "未知路径"),
+      path: fallbackText(row.path, UNKNOWN_WORKSPACE_DISPLAY),
+      workspaceKey,
       sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : null,
       isSubagent: row.isSubagent === true,
       parentSourceId: fallbackText(row.parentSourceId, "").trim() || undefined,
@@ -117,15 +119,18 @@ export const normalizeSessionTableRows = (rows: SessionTableRow[]): NormalizedSe
   });
 };
 
-export const buildGroups = (rows: NormalizedSessionRow[], groupPathHints: string[] = []): SessionGroup[] => {
+export const buildGroups = (
+  rows: NormalizedSessionRow[],
+  groupPathHints: string[] = [],
+  workspaceStatuses: WorkspaceStatusMap = {},
+): SessionGroup[] => {
   const grouped = new Map<string, { displayPath: string; rows: NormalizedSessionRow[] }>();
   for (const row of rows) {
-    const normalized = normalizeGroupPath(row.path);
+    const normalized = row.workspaceKey === UNKNOWN_WORKSPACE_KEY
+      ? { key: UNKNOWN_WORKSPACE_KEY, display: UNKNOWN_WORKSPACE_DISPLAY }
+      : { key: row.workspaceKey, display: normalizeGroupPath(row.path).display };
     const current = grouped.get(normalized.key);
     if (current) {
-      if (current.displayPath === "未知路径" && normalized.display !== "未知路径") {
-        current.displayPath = normalized.display;
-      }
       current.rows.push(row);
       continue;
     }
@@ -163,6 +168,10 @@ export const buildGroups = (rows: NormalizedSessionRow[], groupPathHints: string
     }, "");
     return {
       groupKey,
+      workspaceKey: groupRows[0]?.workspaceKey ?? UNKNOWN_WORKSPACE_KEY,
+      directoryStatus: groupKey === UNKNOWN_WORKSPACE_KEY
+        ? { status: "unknown", reason: "missing_workspace_path" }
+        : workspaceStatuses[groupRows[0]?.workspaceKey ?? groupKey] ?? { status: "unchecked" },
       displayPath: groupMeta.displayPath,
       rows: groupRows,
       toolLabel,
@@ -179,8 +188,9 @@ export const sortSessionGroups = (
   rows: NormalizedSessionRow[],
   groupPathHints: string[],
   sortMode: SessionSortMode,
+  workspaceStatuses: WorkspaceStatusMap = {},
 ) => {
-  const base = buildGroups(rows, groupPathHints).map((group) => ({
+  const base = buildGroups(rows, groupPathHints, workspaceStatuses).map((group) => ({
     ...group,
     rows: [...group.rows],
   }));

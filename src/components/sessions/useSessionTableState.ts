@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { getLegacyWorkspacePathKey } from "../../lib/workspaceStatus";
 import type { SessionResumeState } from "./sessionTableTypes";
 
 type GroupExpandState = {
@@ -274,7 +275,10 @@ export function useSessionTableState({
       const next: Record<string, boolean> = {};
       let changed = false;
       for (const path of groupPaths) {
-        next[path] = prev[path] ?? previousGroupsWereAllExpanded;
+        const legacyPath = getLegacyWorkspacePathKey(path);
+        next[path] = prev[path]
+          ?? (legacyPath ? prev[legacyPath] : undefined)
+          ?? previousGroupsWereAllExpanded;
         if (prev[path] === undefined) {
           changed = true;
         }

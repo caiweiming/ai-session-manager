@@ -1,8 +1,11 @@
+import type { DirectoryStatusInfo } from "../../lib/workspaceStatus";
+
 export type SessionTableRow = {
   id?: string;
   title?: string;
   tool?: string;
   path?: string;
+  workspaceKey?: string;
   sizeBytes?: number;
   isSubagent?: boolean;
   parentSourceId?: string;
@@ -24,6 +27,7 @@ export type NormalizedSessionRow = {
   toolShortLabel: string;
   toolClass: string;
   path: string;
+  workspaceKey: string;
   sizeBytes: number | null;
   isSubagent: boolean;
   parentSourceId?: string;
@@ -35,6 +39,8 @@ export type NormalizedSessionRow = {
 
 export type SessionGroup = {
   groupKey: string;
+  workspaceKey: string;
+  directoryStatus: DirectoryStatusInfo;
   displayPath: string;
   rows: NormalizedSessionRow[];
   toolLabel: string;

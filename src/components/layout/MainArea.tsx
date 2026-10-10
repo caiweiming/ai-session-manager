@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { SessionTable, type SessionSortMode, type SessionTableRow } from "../sessions/SessionTable";
 import { CustomSelect } from "../ui/CustomSelect";
+import type { DirectoryStatusFilter, WorkspaceStatusMap } from "../../lib/workspaceStatus";
 import type { SidebarViewMode } from "./Sidebar";
 import type { useSessionMutationController } from "./hooks/useSessionMutationController";
 
@@ -19,6 +20,11 @@ type MainAreaProps = {
     rows: SessionTableRow[];
     groupPathHints?: string[];
     sessionsState: "loading" | "ready" | "error";
+    directoryStatusFilter: DirectoryStatusFilter;
+    onDirectoryStatusFilterChange: (filter: DirectoryStatusFilter) => void;
+    directoryStatusPhase: "idle" | "checking" | "ready" | "unchecked";
+    directoryStatusError: string | null;
+    workspaceStatuses: WorkspaceStatusMap;
   };
   mutation: ReturnType<typeof useSessionMutationController>;
   scanErrorMessage?: string | null;
@@ -48,6 +54,11 @@ export function MainArea({
     rows,
     groupPathHints,
     sessionsState,
+    directoryStatusFilter,
+    onDirectoryStatusFilterChange,
+    directoryStatusPhase,
+    directoryStatusError,
+    workspaceStatuses,
   } = list;
   const {
     handleDeleteSession,
@@ -181,10 +192,20 @@ export function MainArea({
     { value: "size_asc", label: "大小从小到大" },
   ];
 
+  const directoryStatusFilterOptions = [
+    { value: "all", label: "全部目录" },
+    { value: "attention", label: "需要关注" },
+    { value: "missing", label: "目录不存在" },
+    { value: "unavailable", label: "目录不可用" },
+    { value: "unknown", label: "目录未知" },
+    { value: "available", label: "目录正常" },
+  ];
+
   const isResetEnabled =
     selectedTool !== null ||
     searchKeyword.trim().length > 0 ||
     updatedWithinDays !== null ||
+    directoryStatusFilter !== "all" ||
     sortMode !== "default" ||
     viewMode !== "overview";
 
@@ -192,6 +213,9 @@ export function MainArea({
     selectedTool ? "工具筛选" : null,
     searchKeyword.trim() ? `搜索“${searchKeyword.trim()}”` : null,
     updatedWithinDays !== null ? `最近 ${updatedWithinDays} 天` : null,
+    viewMode === "overview" && directoryStatusFilter !== "all"
+      ? `目录状态：${directoryStatusFilterOptions.find((option) => option.value === directoryStatusFilter)?.label ?? ""}`
+      : null,
     sortMode !== "default" ? "自定义排序" : null,
   ].filter((item): item is string => item !== null);
 
@@ -242,6 +266,23 @@ export function MainArea({
             }
             className="toolbar-custom-select"
           />
+          {viewMode === "overview" ? (
+            <CustomSelect
+              ariaLabel="session-directory-status-filter"
+              value={directoryStatusFilter}
+              disabled={directoryStatusPhase !== "ready"}
+              title={directoryStatusPhase === "unchecked" ? "目录状态检查失败" : directoryStatusPhase !== "ready" ? "目录状态检查中" : undefined}
+              onChange={(value) => onDirectoryStatusFilterChange(value as DirectoryStatusFilter)}
+              options={directoryStatusFilterOptions}
+              leadingIcon={
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 8v4l2.5 2.5" />
+                </svg>
+              }
+              className="toolbar-custom-select"
+            />
+          ) : null}
           <CustomSelect
             ariaLabel="session-sort-mode"
             value={sortMode}
@@ -328,7 +369,7 @@ export function MainArea({
         </div>
       </div>
 
-      <div className="session-list-summary" aria-live="polite">
+      <div className="session-list-summary" data-testid="session-list-summary" aria-live="polite">
         <span>当前 {rows.length} 个会话</span>
         {filterSummary.map((filter) => <span key={filter}>{filter}</span>)}
       </div>
@@ -350,9 +391,21 @@ export function MainArea({
         </div>
       ) : null}
 
+      {directoryStatusPhase === "unchecked" && directoryStatusError ? (
+        <div className="main-area-error-banner directory-status-error-banner" data-testid="directory-status-error" role="status" aria-live="polite">
+          <div className="main-area-error-copy">
+            <span className="main-area-error-title">目录状态检查失败</span>
+            <span className="main-area-error-message">
+              {directoryStatusError}。列表仍可浏览，重新加载或重新扫描后会重试。
+            </span>
+          </div>
+        </div>
+      ) : null}
+
       <div className="table-container">
         <SessionTable
           rows={rows}
+          workspaceStatuses={workspaceStatuses}
           groupPathHints={groupPathHints}
           onSelectionChange={setSelectedIds}
           highlightKeyword={searchKeyword}

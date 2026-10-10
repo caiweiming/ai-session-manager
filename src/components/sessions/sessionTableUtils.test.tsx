@@ -6,6 +6,7 @@ import {
   normalizeGroupPath,
 } from "./sessionTableUtils";
 import type { SessionTableRow } from "./sessionTableTypes";
+import { UNKNOWN_WORKSPACE_KEY } from "../../lib/workspaceStatus";
 
 describe("sessionTableUtils", () => {
   it("normalizes row identity and fallback fields", () => {
@@ -58,11 +59,112 @@ describe("sessionTableUtils", () => {
     expect(groups[0]?.rows).toHaveLength(2);
   });
 
+  it("uses the shared workspace key to preserve a checking status across Windows path variants", () => {
+    const rows = normalizeSessionTableRows([
+      {
+        id: "1",
+        tool: "codex",
+        path: "d:/Works/status-demo/",
+        workspaceKey: "d:\\works\\status-demo",
+      },
+      {
+        id: "2",
+        tool: "gemini",
+        path: "D:\\works\\status-demo",
+        workspaceKey: "d:\\works\\status-demo",
+      },
+    ]);
+
+    const groups = buildGroups(rows, [], {
+      "d:\\works\\status-demo": { status: "checking" },
+    });
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({
+      workspaceKey: "d:\\works\\status-demo",
+      directoryStatus: { status: "checking" },
+    });
+    expect(groups[0]?.rows.map((row) => row.workspaceKey)).toEqual([
+      "d:\\works\\status-demo",
+      "d:\\works\\status-demo",
+    ]);
+  });
+
+  it("forces the unknown directory group to use the missing workspace path reason", () => {
+    const rows = normalizeSessionTableRows([
+      {
+        id: "unknown",
+        tool: "codex",
+        path: "",
+        workspaceKey: UNKNOWN_WORKSPACE_KEY,
+      },
+    ]);
+
+    const groups = buildGroups(rows, [], {
+      [UNKNOWN_WORKSPACE_KEY]: { status: "available" },
+    });
+
+    expect(groups[0]).toMatchObject({
+      groupKey: UNKNOWN_WORKSPACE_KEY,
+      workspaceKey: UNKNOWN_WORKSPACE_KEY,
+      displayPath: "未知目录",
+      directoryStatus: {
+        status: "unknown",
+        reason: "missing_workspace_path",
+      },
+    });
+  });
+
+  it.each([""])(
+    "maps an empty path %s without workspaceKey to the unknown directory status",
+    (path) => {
+      const rows = normalizeSessionTableRows([
+        {
+          id: `legacy-${path || "empty"}`,
+          tool: "codex",
+          path,
+        },
+      ]);
+
+      const groups = buildGroups(rows);
+
+      expect(rows[0]?.workspaceKey).toBe(UNKNOWN_WORKSPACE_KEY);
+      expect(groups[0]).toMatchObject({
+        workspaceKey: UNKNOWN_WORKSPACE_KEY,
+        directoryStatus: {
+          status: "unknown",
+          reason: "missing_workspace_path",
+        },
+      });
+    },
+  );
+
+  it.each(["未知路径", "未知目录"])(
+    "keeps a real path named %s separate from the unknown directory identity",
+    (path) => {
+      const rows = normalizeSessionTableRows([{ id: path, tool: "codex", path }]);
+
+      expect(rows[0]?.workspaceKey).not.toBe(UNKNOWN_WORKSPACE_KEY);
+      expect(buildGroups(rows)[0]).toMatchObject({
+        displayPath: path,
+        directoryStatus: { status: "unchecked" },
+      });
+    },
+  );
+
   it("normalizes empty paths to unknown group", () => {
     expect(normalizeGroupPath("   ")).toEqual({
-      key: "unknown-path",
-      display: "未知路径",
+      key: UNKNOWN_WORKSPACE_KEY,
+      display: "未知目录",
     });
+  });
+
+  it("does not default a real group with a missing status result to available", () => {
+    const rows = normalizeSessionTableRows([
+      { id: "unchecked", tool: "codex", path: "D:\\Works\\unchecked" },
+    ]);
+
+    expect(buildGroups(rows)[0]?.directoryStatus).toEqual({ status: "unchecked" });
   });
 
   it("formats table update timestamps with date and minute precision", () => {

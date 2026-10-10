@@ -6,15 +6,18 @@ use super::mappers::{
     map_app_settings, map_overview_summary, map_session_detail, map_session_list_row,
 };
 use super::models::{
-    AppSettingsResponse, ClearTrashResponse, CommandError, DeleteSessionPayload,
-    DeleteSessionResponse, DeleteSessionsPayload, ExportSessionMarkdownPayload, ExportSessionMarkdownResponse,
+    AppSettingsResponse, CheckWorkspacePathsPayload, CheckWorkspacePathsResponse,
+    ClearTrashResponse, CommandError, DeleteSessionPayload, DeleteSessionResponse,
+    DeleteSessionsPayload, ExportSessionMarkdownPayload, ExportSessionMarkdownResponse,
     GetSessionDetailPayload, ListSessionsPayload, ListSubagentSessionsPayload,
     OpenExternalUrlPayload, OpenResumeInTerminalPayload, OverviewSummaryResponse,
     RestoreSessionPayload, RestoreSessionResponse, ScanSourcesPayload, SessionDetailResponse,
-    SessionListResponse, UpdateAppSettingsPayload,
+    SessionListResponse, UpdateAppSettingsPayload, WorkspacePathCheckResultResponse,
+    WorkspacePathStatusReasonResponse, WorkspacePathStatusResponse,
 };
 use crate::application::session_admin_service::{
-    clear_trash as clear_trash_service, clear_trash_with_progress as clear_trash_with_progress_service,
+    clear_trash as clear_trash_service,
+    clear_trash_with_progress as clear_trash_with_progress_service,
     delete_session as delete_session_service, delete_sessions as delete_sessions_service,
     delete_sessions_with_progress as delete_sessions_with_progress_service,
     export_session_markdown as export_session_markdown_service,
@@ -36,11 +39,52 @@ use crate::application::session_settings_service::{
     load_app_settings as load_app_settings_record,
     update_app_settings as update_app_settings_record, ScanSourcesRecord, UpdateAppSettingsRequest,
 };
+use crate::application::workspace_status_service::{
+    check_workspace_paths as check_workspace_paths_service, WorkspacePathCheckResult,
+    WorkspacePathStatus, WorkspacePathStatusReason,
+};
 use crate::db::migrate::init_db;
 use crate::domain::safety::{normalize_page, normalize_page_size};
 use crate::services::sync_service::RefreshSummary;
 
 pub type CommandResult<T> = Result<T, CommandError>;
+
+pub async fn check_workspace_paths_at(
+    payload: CheckWorkspacePathsPayload,
+) -> CommandResult<CheckWorkspacePathsResponse> {
+    let results = check_workspace_paths_service(payload.paths)
+        .await
+        .into_iter()
+        .map(map_workspace_path_check_result)
+        .collect();
+    Ok(CheckWorkspacePathsResponse { results })
+}
+
+fn map_workspace_path_check_result(
+    result: WorkspacePathCheckResult,
+) -> WorkspacePathCheckResultResponse {
+    WorkspacePathCheckResultResponse {
+        path: result.path,
+        status: match result.status {
+            WorkspacePathStatus::Available => WorkspacePathStatusResponse::Available,
+            WorkspacePathStatus::Missing => WorkspacePathStatusResponse::Missing,
+            WorkspacePathStatus::Unavailable => WorkspacePathStatusResponse::Unavailable,
+        },
+        reason: result.reason.map(|reason| match reason {
+            WorkspacePathStatusReason::PermissionDenied => {
+                WorkspacePathStatusReasonResponse::PermissionDenied
+            }
+            WorkspacePathStatusReason::NotDirectory => {
+                WorkspacePathStatusReasonResponse::NotDirectory
+            }
+            WorkspacePathStatusReason::Timeout => WorkspacePathStatusReasonResponse::Timeout,
+            WorkspacePathStatusReason::StorageUnavailable => {
+                WorkspacePathStatusReasonResponse::StorageUnavailable
+            }
+            WorkspacePathStatusReason::IoError => WorkspacePathStatusReasonResponse::IoError,
+        }),
+    }
+}
 
 fn invalid_argument(message: impl Into<String>) -> CommandError {
     CommandError {

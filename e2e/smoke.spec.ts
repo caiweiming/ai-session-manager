@@ -23,14 +23,45 @@ const installInvokeContractMock = async (page: Page) => {
           sourceTool: "claude",
           sourceId: "session-beta",
           title: "迁移日志索引",
-          workspacePath: "D:\\Works\\workspace-beta",
-          sourcePath: "D:\\Works\\workspace-beta\\.claude\\projects\\session-beta.jsonl",
+          workspacePath: "D:\\Works\\workspace-missing",
+          sourcePath: "D:\\Works\\workspace-missing\\.claude\\projects\\session-beta.jsonl",
           createdAt: "2026-04-20T08:00:00Z",
           updatedAt: "2026-04-20T09:00:00Z",
           sizeBytes: 1024,
         },
+        {
+          sourceTool: "gemini",
+          sourceId: "session-gamma",
+          title: "修复受限目录",
+          workspacePath: "D:\\Works\\workspace-unavailable",
+          sourcePath: "D:\\Works\\workspace-unavailable\\.gemini\\history\\session-gamma.jsonl",
+          createdAt: "2026-04-19T08:00:00Z",
+          updatedAt: "2026-04-19T09:00:00Z",
+          sizeBytes: 512,
+        },
+        {
+          sourceTool: "codex",
+          sourceId: "session-delta",
+          title: "整理未知目录会话",
+          workspacePath: "",
+          sourcePath: "D:\\Archive\\session-delta.jsonl",
+          createdAt: "2026-04-18T08:00:00Z",
+          updatedAt: "2026-04-18T09:00:00Z",
+          sizeBytes: 256,
+        },
       ],
-      trashSessions: [] as Array<{
+      trashSessions: [
+        {
+          sourceTool: "claude",
+          sourceId: "trash-missing",
+          title: "回收站缺失目录会话",
+          workspacePath: "D:\\Works\\workspace-missing",
+          sourcePath: "D:\\Works\\workspace-missing\\.claude\\projects\\trash-missing.jsonl",
+          createdAt: "2026-04-17T08:00:00Z",
+          updatedAt: "2026-04-17T09:00:00Z",
+          sizeBytes: 128,
+        },
+      ] as Array<{
         sourceTool: string;
         sourceId: string;
         title: string;
@@ -71,8 +102,8 @@ const installInvokeContractMock = async (page: Page) => {
           sourceTool: "claude",
           sourceId: "session-beta",
           title: "迁移日志索引",
-          workspacePath: "D:\\Works\\workspace-beta",
-          sourcePath: "D:\\Works\\workspace-beta\\.claude\\projects\\session-beta.jsonl",
+          workspacePath: "D:\\Works\\workspace-missing",
+          sourcePath: "D:\\Works\\workspace-missing\\.claude\\projects\\session-beta.jsonl",
           createdAt: "2026-04-20T08:00:00Z",
           updatedAt: "2026-04-20T09:00:00Z",
           sizeBytes: 1024,
@@ -176,6 +207,20 @@ const installInvokeContractMock = async (page: Page) => {
           rows: clone(listRows(args?.payload as { tool?: string; keyword?: string } | undefined)),
         };
       }
+      if (command === "check_workspace_paths") {
+        const paths = (args?.payload?.paths ?? []) as string[];
+        return {
+          results: paths.map((path) => {
+            if (path === "D:\\Works\\workspace-missing") {
+              return { path, status: "missing" };
+            }
+            if (path === "D:\\Works\\workspace-unavailable") {
+              return { path, status: "unavailable", reason: "permission_denied" };
+            }
+            return { path, status: "available" };
+          }),
+        };
+      }
       if (command === "list_trash_sessions") {
         return {
           rows: clone(state.trashSessions),
@@ -252,12 +297,74 @@ const getCommandCallCount = async (page: Page, command: string) => {
 };
 
 const expandAllGroups = async (page: Page) => {
-  const expandAllButton = page.getByLabel("expand-all-groups");
+  const expandAllButton = page.getByLabel("group-expand-toggle");
   await expect(expandAllButton).toBeVisible();
   if (await expandAllButton.isDisabled()) {
     return;
   }
   await expandAllButton.click();
+};
+
+const expectToolbarControlsNotToOverlap = async (page: Page) => {
+  const layout = await page.locator(".toolbar").evaluate((toolbar) => {
+    const toolbarRect = toolbar.getBoundingClientRect();
+    const elements = Array.from(toolbar.querySelectorAll("input, button"));
+    const boxes = elements
+      .filter((element) => {
+        const style = window.getComputedStyle(element);
+        return style.display !== "none" && style.visibility !== "hidden";
+      })
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          label: element.getAttribute("aria-label") ?? element.textContent?.trim() ?? element.tagName,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          bottom: rect.bottom,
+        };
+      });
+
+    return {
+      boxes,
+      toolbar: {
+        left: toolbarRect.left,
+        right: toolbarRect.right,
+        top: toolbarRect.top,
+        bottom: toolbarRect.bottom,
+      },
+      browserViewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
+    };
+  });
+
+  const { boxes, toolbar, browserViewport } = layout;
+  const tolerance = 0.5;
+
+  for (const box of boxes) {
+    expect(box.left, `${box.label} 左侧应位于 toolbar 内`).toBeGreaterThanOrEqual(toolbar.left - tolerance);
+    expect(box.right, `${box.label} 右侧应位于 toolbar 内`).toBeLessThanOrEqual(toolbar.right + tolerance);
+    expect(box.top, `${box.label} 顶部应位于 toolbar 内`).toBeGreaterThanOrEqual(toolbar.top - tolerance);
+    expect(box.bottom, `${box.label} 底部应位于 toolbar 内`).toBeLessThanOrEqual(toolbar.bottom + tolerance);
+    expect(box.left, `${box.label} 左侧应位于浏览器视口内`).toBeGreaterThanOrEqual(-tolerance);
+    expect(box.right, `${box.label} 右侧应位于浏览器视口内`).toBeLessThanOrEqual(browserViewport.width + tolerance);
+    expect(box.top, `${box.label} 顶部应位于浏览器视口内`).toBeGreaterThanOrEqual(-tolerance);
+    expect(box.bottom, `${box.label} 底部应位于浏览器视口内`).toBeLessThanOrEqual(browserViewport.height + tolerance);
+  }
+
+  for (let firstIndex = 0; firstIndex < boxes.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < boxes.length; secondIndex += 1) {
+      const first = boxes[firstIndex];
+      const second = boxes[secondIndex];
+      const overlaps = first.left < second.right
+        && first.right > second.left
+        && first.top < second.bottom
+        && first.bottom > second.top;
+      expect(overlaps, `${first.label} 与 ${second.label} 不应重叠`).toBe(false);
+    }
+  }
 };
 
 test("app shell smoke: startup, scan, search, inspect, export, delete", async ({ page }) => {
@@ -318,31 +425,97 @@ test("app shell smoke: startup, scan, search, inspect, export, delete", async ({
   await expect.poll(() => getCommandCallCount(page, "delete_session")).toBe(1);
 });
 
-test("overview sticky parent appears while scrolling expanded subagent rows", async ({ page }) => {
+test("directory status indicators, attention filter, and trash visibility follow the current contract", async ({ page }) => {
+  await installInvokeContractMock(page);
+  await page.goto("http://localhost:1420");
+
+  const mainArea = page.getByTestId("main-area");
+  await expect(mainArea).toHaveAttribute("data-sessions-state", "ready");
+
+  const statusFilter = page.getByLabel("session-directory-status-filter");
+  await expect(statusFilter).toBeEnabled();
+  await expect(page.getByRole("img", { name: "目录不存在" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "没有访问权限" })).toBeVisible();
+
+  const unknownIndicator = page.getByRole("img", { name: "目录状态未知：会话未记录工作目录" });
+  await expect(unknownIndicator).toBeVisible();
+  await expect(mainArea.getByText("未知目录", { exact: true })).toBeVisible();
+
+  await unknownIndicator.focus();
+  const unknownTooltip = unknownIndicator.locator(".directory-status-tooltip");
+  await expect(unknownTooltip).toBeVisible();
+  await expect(unknownTooltip).toHaveText("目录状态未知：会话未记录工作目录");
+
+  await statusFilter.click();
+  await page.getByRole("option", { name: "需要关注" }).getByRole("button").click();
+  await expect(page.getByTestId("session-list-summary")).toContainText("目录状态：需要关注");
+
+  await expandAllGroups(page);
+  await expect(page.getByRole("button", { name: "迁移日志索引" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "修复受限目录" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "整理未知目录会话" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "排查支付超时" })).toHaveCount(0);
+
+  await expect(page.getByLabel("rescan-local-data")).toBeEnabled();
+  await page.getByLabel("switch-trash").click();
+
+  const sessionTable = page.getByRole("table", { name: "session-table" });
+  const trashGroupToggle = sessionTable.getByLabel("toggle-group-D:\\Works\\workspace-missing");
+  const trashSession = sessionTable.getByRole("button", { name: "回收站缺失目录会话" });
+  await expect(page.getByTestId("session-list-summary")).toHaveText("当前 1 个会话");
+  await expect(trashGroupToggle).toBeVisible();
+  if (!await trashSession.isVisible()) {
+    await trashGroupToggle.click();
+  }
+  await expect(trashSession).toHaveCount(1);
+  await expect(trashSession).toBeVisible();
+
+  const trashGroup = trashGroupToggle.locator("xpath=ancestor::*[@role='row'][1]");
+  await expect(trashGroup.getByRole("img", { name: "目录不存在" })).toBeVisible();
+  await expect(page.getByLabel("session-directory-status-filter")).toHaveCount(0);
+  await expect(page.getByTestId("session-list-summary")).not.toContainText("目录状态：需要关注");
+  await expect(page.getByTestId("session-list-summary")).not.toContainText("目录状态：");
+});
+
+test("toolbar controls remain separate at desktop and narrow supported widths", async ({ page }) => {
+  await installInvokeContractMock(page);
+
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 1000, height: 760 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("http://localhost:1420");
+    await expect(page.getByLabel("session-directory-status-filter")).toBeEnabled();
+    await expectToolbarControlsNotToOverlap(page);
+  }
+});
+
+test("overview sticky directory shows an in-viewport status tooltip while scrolling main sessions", async ({ page }) => {
   await page.addInitScript(() => {
     const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
     const sessions = [
-      {
+      ...Array.from({ length: 18 }, (_, index) => ({
         sourceTool: "codex",
-        sourceId: "main-sticky",
-        title: "主会话 Sticky",
+        sourceId: `sticky-${index + 1}`,
+        title: `吸顶目录会话 ${index + 1}`,
         workspacePath: "D:\\Works\\sticky-demo",
-        sourcePath: "D:\\Works\\sticky-demo\\.codex\\history\\main-sticky.jsonl",
+        sourcePath: `D:\\Works\\sticky-demo\\.codex\\history\\sticky-${index + 1}.jsonl`,
         createdAt: "2026-04-21T09:00:00Z",
-        updatedAt: "2026-04-21T10:00:00Z",
-        sizeBytes: 2048,
-      },
-      {
-        sourceTool: "codex",
-        sourceId: "main-follow",
-        title: "主会话 Follow",
-        workspacePath: "D:\\Works\\sticky-demo",
-        sourcePath: "D:\\Works\\sticky-demo\\.codex\\history\\main-follow.jsonl",
-        createdAt: "2026-04-21T11:00:00Z",
         updatedAt: "2026-04-21T12:00:00Z",
         sizeBytes: 1024,
-      },
+      })),
+      ...Array.from({ length: 4 }, (_, index) => ({
+        sourceTool: "claude",
+        sourceId: `follow-${index + 1}`,
+        title: `后续目录会话 ${index + 1}`,
+        workspacePath: "D:\\Works\\follow-demo",
+        sourcePath: `D:\\Works\\follow-demo\\.claude\\projects\\follow-${index + 1}.jsonl`,
+        createdAt: "2026-04-20T09:00:00Z",
+        updatedAt: "2026-04-20T12:00:00Z",
+        sizeBytes: 512,
+      })),
     ];
 
     const invokeMock = async (command: string, args?: { payload?: Record<string, unknown> }) => {
@@ -385,29 +558,21 @@ test("overview sticky parent appears while scrolling expanded subagent rows", as
       if (command === "list_sessions") {
         return { rows: clone(sessions) };
       }
+      if (command === "check_workspace_paths") {
+        const paths = (args?.payload?.paths ?? []) as string[];
+        return {
+          results: paths.map((path) => path === "D:\\Works\\sticky-demo"
+            ? { path, status: "unavailable", reason: "timeout" }
+            : { path, status: "available" }),
+        };
+      }
       if (command === "list_trash_sessions") {
         return { rows: [] };
       }
       if (command === "get_session_detail") {
         return { detail: null };
       }
-      if (command === "list_subagent_sessions") {
-        const parentSourceId = args?.payload?.parentSourceId;
-        if (parentSourceId === "main-sticky") {
-          return {
-            rows: Array.from({ length: 14 }, (_, index) => ({
-              sourceTool: "codex",
-              sourceId: `sub-${index + 1}`,
-              title: `子会话 ${index + 1}`,
-              workspacePath: "D:\\Works\\sticky-demo",
-              sourcePath: `D:\\Works\\sticky-demo\\.codex\\history\\sub-${index + 1}.jsonl`,
-              createdAt: "2026-04-21T10:00:20Z",
-              updatedAt: "2026-04-21T10:01:00Z",
-            })),
-          };
-        }
-        return { rows: [] };
-      }
+      if (command === "list_subagent_sessions") return { rows: [] };
       return null;
     };
 
@@ -419,29 +584,46 @@ test("overview sticky parent appears while scrolling expanded subagent rows", as
   await page.goto("http://localhost:1420");
   await expect(page.locator("[data-testid='main-area']")).toHaveAttribute("data-sessions-state", "ready");
 
-  const expandAllButton = page.getByLabel("group-expand-toggle");
-  await expect(expandAllButton).toBeVisible();
-  await expandAllButton.click();
-
-  await page.getByLabel("toggle-subagents-codex:main-sticky").click();
-  await expect(page.getByText("子会话 1")).toBeVisible();
+  await expandAllGroups(page);
+  await expect(page.getByLabel(/^toggle-subagents-/)).toHaveCount(0);
 
   const tableContainer = page.locator(".table-container");
   const viewport = page.locator("[data-testid='session-table-viewport']");
   await expect(viewport).toBeVisible();
 
   await viewport.evaluate((element) => {
-    element.scrollTop = 260;
+    element.scrollTop = 130;
     element.dispatchEvent(new Event("scroll"));
   });
 
-  await expect(viewport.getByTestId("session-table-sticky-parent")).toBeVisible();
-  await expect(viewport.getByTestId("session-table-sticky-parent")).toContainText("主会话 Sticky");
+  const stickyGroup = viewport.getByTestId("session-table-sticky-group");
+  await expect(stickyGroup).toBeVisible();
+  await expect(stickyGroup).toContainText("D:\\Works\\sticky-demo");
+  await expect(stickyGroup).toContainText("18 个会话");
+
+  const stickyStatus = stickyGroup.getByRole("img", { name: "检查超时" });
+  await stickyGroup.getByLabel("toggle-sticky-group-D:\\Works\\sticky-demo").focus();
+  await page.keyboard.press("Tab");
+  await expect(stickyStatus).toBeFocused();
+  const stickyTooltip = stickyStatus.locator(".directory-status-tooltip");
+  await expect(stickyTooltip).toHaveClass(/directory-status-tooltip-below/);
+  await expect(stickyTooltip).toBeVisible();
+
+  const tooltipBounds = await stickyTooltip.boundingBox();
+  const tableViewportBounds = await viewport.boundingBox();
+  expect(tooltipBounds).not.toBeNull();
+  expect(tableViewportBounds).not.toBeNull();
+  expect(tooltipBounds!.x).toBeGreaterThanOrEqual(tableViewportBounds!.x);
+  expect(tooltipBounds!.y).toBeGreaterThanOrEqual(tableViewportBounds!.y);
+  expect(tooltipBounds!.x + tooltipBounds!.width)
+    .toBeLessThanOrEqual(tableViewportBounds!.x + tableViewportBounds!.width);
+  expect(tooltipBounds!.y + tooltipBounds!.height)
+    .toBeLessThanOrEqual(tableViewportBounds!.y + tableViewportBounds!.height);
 
   const scrollState = await page.evaluate(() => {
     const tableContainer = document.querySelector(".table-container") as HTMLElement | null;
     const viewport = document.querySelector("[data-testid='session-table-viewport']") as HTMLElement | null;
-    const sticky = document.querySelector("[data-testid='session-table-sticky-parent']") as HTMLElement | null;
+    const sticky = document.querySelector("[data-testid='session-table-sticky-group']") as HTMLElement | null;
     return {
       tableContainerScrollTop: tableContainer?.scrollTop ?? null,
       viewportScrollTop: viewport?.scrollTop ?? null,

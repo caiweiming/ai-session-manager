@@ -1,6 +1,6 @@
 [package]
 name = "ai-session-manager"
-version = "0.2.1"
+version = "0.2.2"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -30,6 +30,7 @@ walkdir = "2"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 rfd = "0.15"
 notify = "8"
+tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
 
 [dev-dependencies]
 tempfile = "3"

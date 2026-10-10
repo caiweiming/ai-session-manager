@@ -5,11 +5,12 @@ mod models;
 
 pub use db_path_resolver::DbPathResolver;
 pub use handlers::{
-    clear_trash_at, clear_trash_with_app_at, delete_session_at, delete_sessions_at, delete_sessions_with_app_at,
-    export_session_markdown_at, get_app_settings_at,
-    get_overview_summary_at, get_session_detail_at, list_sessions_at, list_subagent_sessions_at,
-    list_trash_sessions_at, open_external_url_at, open_in_explorer_at, open_resume_in_terminal_at,
-    refresh_sessions_at, restore_session_at, update_app_settings_at, CommandResult,
+    check_workspace_paths_at, clear_trash_at, clear_trash_with_app_at, delete_session_at,
+    delete_sessions_at, delete_sessions_with_app_at, export_session_markdown_at,
+    get_app_settings_at, get_overview_summary_at, get_session_detail_at, list_sessions_at,
+    list_subagent_sessions_at, list_trash_sessions_at, open_external_url_at, open_in_explorer_at,
+    open_resume_in_terminal_at, refresh_sessions_at, restore_session_at, update_app_settings_at,
+    CommandResult,
 };
 pub use models::*;
 
@@ -67,6 +68,13 @@ fn open_resume_in_terminal_with(
     handler: OpenResumeInTerminalHandlerFn,
 ) -> CommandResult<()> {
     handler(payload)
+}
+
+#[tauri::command]
+pub async fn check_workspace_paths(
+    payload: CheckWorkspacePathsPayload,
+) -> CommandResult<CheckWorkspacePathsResponse> {
+    check_workspace_paths_at(payload).await
 }
 
 #[tauri::command]

@@ -17,6 +17,17 @@ it("calls tauri list_sessions and renders app shell", async () => {
   expect(screen.getByTestId("main-area")).toBeInTheDocument();
 });
 
+it("calls check_workspace_paths with the expected payload contract", async () => {
+  const payload = { paths: ["D:\\Works\\alpha", "/srv/beta"] };
+  const result = await api.checkWorkspacePaths(payload);
+
+  expect(invokeMock).toHaveBeenCalledWith("check_workspace_paths", { payload });
+  expect(result.results).toEqual([
+    { path: "D:\\Works\\alpha", status: "available" },
+    { path: "/srv/beta", status: "available" },
+  ]);
+});
+
 it("calls refresh_sessions with expected command and returns summary shape", async () => {
   const result = await api.refreshSessions();
 

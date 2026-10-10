@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeSessionTableRows, sortSessionGroups } from "./sessionTableUtils";
+import { normalizeWorkspacePath } from "../../lib/workspaceStatus";
 import {
   buildVirtualSessionRows,
   getVirtualWindow,
@@ -14,19 +15,21 @@ describe("sessionTableVirtualization", () => {
       { id: "claude:3", title: "C", tool: "claude", path: "D:\\Works\\other" },
     ]);
     const groups = sortSessionGroups(rows, [], "default");
+    const demoKey = normalizeWorkspacePath("D:\\Works\\demo").key;
+    const otherKey = normalizeWorkspacePath("D:\\Works\\other").key;
 
     const flattened = buildVirtualSessionRows(
       groups,
       {
-        "d:\\works\\demo": true,
-        "d:\\works\\other": false,
+        [demoKey]: true,
+        [otherKey]: false,
       },
     );
 
     expect(flattened.map((row) => `${row.type}:${row.key}`)).toEqual([
-      "group:group-d:\\works\\demo",
+      `group:group-${demoKey}`,
       "session:codex:1",
-      "group:group-d:\\works\\other",
+      `group:group-${otherKey}`,
     ]);
     expect(flattened[1]).toMatchObject({
       type: "session",
@@ -36,7 +39,7 @@ describe("sessionTableVirtualization", () => {
     });
     expect(flattened[0]).toMatchObject({
       type: "group",
-      key: "group-d:\\works\\demo",
+      key: `group-${demoKey}`,
       height: GROUP_ROW_HEIGHT,
     });
   });
@@ -100,16 +103,17 @@ describe("sessionTableVirtualization", () => {
       },
     ]);
     const groups = sortSessionGroups(rows, [], "default");
+    const demoKey = normalizeWorkspacePath("D:\\Works\\demo").key;
 
     const flattened = buildVirtualSessionRows(
       groups,
       {
-        "d:\\works\\demo": true,
+        [demoKey]: true,
       },
     );
 
     expect(flattened.map((row) => `${row.type}:${row.key}`)).toEqual([
-      "group:group-d:\\works\\demo",
+      `group:group-${demoKey}`,
       "session:codex:main-1",
       "session:codex:main-2",
     ]);
@@ -129,13 +133,14 @@ describe("sessionTableVirtualization", () => {
       },
     ]);
     const groups = sortSessionGroups(rows, [], "default");
+    const projectKey = normalizeWorkspacePath("/Users/demo/project").key;
 
     const flattened = buildVirtualSessionRows(groups, {
-      "/Users/demo/project": true,
+      [projectKey]: true,
     });
 
     expect(flattened.map((row) => `${row.type}:${row.key}`)).toEqual([
-      "group:group-/Users/demo/project",
+      `group:group-${projectKey}`,
       "session:claude:sub-1",
     ]);
     expect(flattened[1]).toMatchObject({ isLastChild: true });

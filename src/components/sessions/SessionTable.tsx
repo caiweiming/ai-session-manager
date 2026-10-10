@@ -1,5 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import type { WorkspaceStatusMap } from "../../lib/workspaceStatus";
 import type {
   NormalizedSessionRow,
   SessionSortMode,
@@ -28,10 +29,12 @@ export type { SessionSortMode, SessionTableRow, SessionTableViewMode } from "./s
 
 const OVERSCAN_ROWS = 4;
 const STICKY_TRIGGER_OFFSET = 6;
+const EMPTY_WORKSPACE_STATUSES: WorkspaceStatusMap = {};
 
 export function SessionTable({
   rows,
   groupPathHints = [],
+  workspaceStatuses = EMPTY_WORKSPACE_STATUSES,
   onSelectionChange,
   activeSessionId: controlledActiveSessionId,
   onActiveSessionChange,
@@ -49,6 +52,7 @@ export function SessionTable({
 }: {
   rows: SessionTableRow[];
   groupPathHints?: string[];
+  workspaceStatuses?: WorkspaceStatusMap;
   onSelectionChange?: (ids: string[]) => void;
   activeSessionId?: string | null;
   onActiveSessionChange?: (id: string) => void;
@@ -80,8 +84,8 @@ export function SessionTable({
   );
 
   const groups = useMemo(() => {
-    return sortSessionGroups(normalizedRows, groupPathHints, sortMode);
-  }, [groupPathHints, normalizedRows, sortMode]);
+    return sortSessionGroups(normalizedRows, groupPathHints, sortMode, workspaceStatuses);
+  }, [groupPathHints, normalizedRows, sortMode, workspaceStatuses]);
   const hasRows = groups.length > 0;
   const groupPaths = useMemo(() => groups.map((group) => group.groupKey), [groups]);
   const normalizedHighlightKeyword = useMemo(() => {

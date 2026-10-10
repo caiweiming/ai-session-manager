@@ -13,6 +13,7 @@ export function CustomSelect({
   disabled = false,
   leadingIcon,
   className = "",
+  title,
 }: {
   ariaLabel: string;
   value: string;
@@ -21,6 +22,7 @@ export function CustomSelect({
   disabled?: boolean;
   leadingIcon?: React.ReactNode;
   className?: string;
+  title?: string;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -59,6 +61,7 @@ export function CustomSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         disabled={disabled}
+        title={title}
         onClick={() => {
           if (disabled) return;
           setOpen((valueNow) => !valueNow);

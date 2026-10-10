@@ -37,6 +37,10 @@ const defaultRows = [
 ];
 
 let listRowsQueue: typeof defaultRows[];
+let workspaceStatusResponse: {
+  results: Array<{ path: string; status: "available" | "missing" | "unavailable" | "unknown" }>;
+};
+let workspaceStatusPromise: Promise<typeof workspaceStatusResponse> | null;
 type FailedFileDetail = {
   sourceTool: string;
   sourcePath: string;
@@ -217,6 +221,8 @@ beforeEach(() => {
   invokeMock.mockReset();
   listenMock.mockReset();
   listRowsQueue = [defaultRows];
+  workspaceStatusResponse = { results: [] };
+  workspaceStatusPromise = null;
   window.localStorage.clear();
   global.fetch = originalFetch;
 
@@ -284,6 +290,10 @@ beforeEach(() => {
     if (cmd === "list_sessions") {
       const rows = listRowsQueue.length > 1 ? (listRowsQueue.shift() ?? []) : (listRowsQueue[0] ?? []);
       return { rows };
+    }
+    if (cmd === "check_workspace_paths") {
+      if (workspaceStatusPromise) return workspaceStatusPromise;
+      return workspaceStatusResponse;
     }
     if (cmd === "list_trash_sessions") {
       return {
@@ -410,6 +420,137 @@ it("startup triggers refresh_sessions", async () => {
   const listIndex = invokeMock.mock.calls.findIndex((call) => call[0] === "list_sessions");
   expect(refreshIndex).toBeGreaterThanOrEqual(0);
   expect(listIndex).toBeGreaterThanOrEqual(0);
+});
+
+it("filters overview sessions by directory attention status and shows the summary", async () => {
+  const statusRows = [
+    { ...defaultRows[0], title: "可用目录会话", workspacePath: "D:\\Works\\available" },
+    { ...defaultRows[1], sourceId: "missing-id", title: "缺失目录会话", workspacePath: "D:\\Works\\missing" },
+    { ...defaultRows[0], sourceId: "unavailable-id", title: "不可用目录会话", workspacePath: "D:\\Works\\unavailable" },
+    { ...defaultRows[1], sourceId: "unknown-id", title: "未知目录会话", workspacePath: "" },
+  ];
+  listRowsQueue = [statusRows];
+  workspaceStatusResponse = {
+    results: [
+      { path: "D:\\Works\\available", status: "available" },
+      { path: "D:\\Works\\missing", status: "missing" },
+      { path: "D:\\Works\\unavailable", status: "unavailable" },
+    ],
+  };
+
+  render(<AppShell />);
+
+  const statusFilter = await screen.findByLabelText("session-directory-status-filter");
+  await waitFor(() => expect(statusFilter).toBeEnabled());
+  fireEvent.click(statusFilter);
+  fireEvent.click(within(screen.getByRole("option", { name: "需要关注" })).getByRole("button"));
+
+  await expandAllGroups();
+  expect(screen.getByText("缺失目录会话")).toBeInTheDocument();
+  expect(screen.getByText("不可用目录会话")).toBeInTheDocument();
+  expect(screen.getByText("未知目录会话")).toBeInTheDocument();
+  expect(screen.queryByText("可用目录会话")).not.toBeInTheDocument();
+  expect(screen.getByTestId("session-list-summary")).toHaveTextContent("目录状态：需要关注");
+});
+
+it("hides the directory status summary when switching the selected filter to trash", async () => {
+  workspaceStatusResponse = {
+    results: defaultRows.map((row, index) => ({
+      path: row.workspacePath,
+      status: index === 0 ? "missing" as const : "available" as const,
+    })),
+  };
+  render(<AppShell />);
+
+  const statusFilter = await screen.findByLabelText("session-directory-status-filter");
+  await waitFor(() => expect(statusFilter).toBeEnabled());
+  fireEvent.click(statusFilter);
+  fireEvent.click(within(screen.getByRole("option", { name: "需要关注" })).getByRole("button"));
+  expect(screen.getByTestId("session-list-summary")).toHaveTextContent("目录状态：需要关注");
+
+  await waitFor(() => expect(screen.getByLabelText("rescan-local-data")).not.toBeDisabled());
+  await clickElement(await screen.findByLabelText("switch-trash"));
+  await waitFor(() => expect(getCommandCallCount("list_trash_sessions")).toBeGreaterThan(0));
+  expect(screen.queryByLabelText("session-directory-status-filter")).not.toBeInTheDocument();
+  expect(screen.queryByText("目录状态：需要关注")).not.toBeInTheDocument();
+});
+
+it("keeps sessions visible while directory status checking and disables the status filter", async () => {
+  const deferred = createDeferred<typeof workspaceStatusResponse>();
+  workspaceStatusPromise = deferred.promise;
+  render(<AppShell />);
+
+  const statusFilter = await screen.findByLabelText("session-directory-status-filter");
+  expect(statusFilter).toBeDisabled();
+  await waitFor(() => expect(statusFilter).toHaveAttribute("title", "目录状态检查中"));
+  await expandAllGroups();
+  expect(screen.getByText("真实会话 Alpha：排查 S3 签名失效")).toBeInTheDocument();
+
+  deferred.resolve({
+    results: defaultRows.map((row) => ({ path: row.workspacePath, status: "available" as const })),
+  });
+  await waitFor(() => expect(statusFilter).toBeEnabled());
+});
+
+it("shows a non-blocking directory status error while retaining the session list", async () => {
+  const deferred = createDeferred<typeof workspaceStatusResponse>();
+  void deferred.promise.catch(() => undefined);
+  workspaceStatusPromise = deferred.promise;
+  render(<AppShell />);
+
+  const statusFilter = await screen.findByLabelText("session-directory-status-filter");
+  expect(statusFilter).toBeDisabled();
+  await act(async () => {
+    deferred.reject(new Error("batch check failed"));
+  });
+
+  await waitFor(() => {
+    expect(screen.getByTestId("directory-status-error")).toHaveTextContent("目录状态检查失败");
+  });
+  expect(screen.getByTestId("directory-status-error")).toHaveTextContent("列表仍可浏览");
+  expect(statusFilter).toBeDisabled();
+  await expandAllGroups();
+  expect(screen.getByText("真实会话 Alpha：排查 S3 签名失效")).toBeInTheDocument();
+});
+
+it("hides the directory status filter in trash while retaining status indicators", async () => {
+  workspaceStatusResponse = {
+    results: [{ path: "D:\\Works\\huobao-novel-main", status: "missing" }],
+  };
+  render(<AppShell />);
+
+  fireEvent.click(await screen.findByLabelText("switch-trash"));
+  await waitFor(() => expect(getCommandCallCount("list_trash_sessions")).toBeGreaterThan(0));
+  expect(screen.queryByLabelText("session-directory-status-filter")).not.toBeInTheDocument();
+
+  await expandAllGroups();
+  expect(screen.getByLabelText("目录不存在")).toBeInTheDocument();
+  expect(screen.getByText("当前 1 个会话")).toBeInTheDocument();
+  expect(screen.queryByText(/目录状态：/)).not.toBeInTheDocument();
+});
+
+it("resets the directory status filter without adding it to list payload", async () => {
+  workspaceStatusResponse = {
+    results: defaultRows.map((row, index) => ({
+      path: row.workspacePath,
+      status: index === 0 ? "missing" as const : "available" as const,
+    })),
+  };
+  render(<AppShell />);
+
+  const statusFilter = await screen.findByLabelText("session-directory-status-filter");
+  await waitFor(() => expect(statusFilter).toBeEnabled());
+  fireEvent.click(statusFilter);
+  fireEvent.click(within(screen.getByRole("option", { name: "目录不存在" })).getByRole("button"));
+  expect(screen.getByTestId("session-list-summary")).toHaveTextContent("目录状态：目录不存在");
+
+  fireEvent.click(screen.getByLabelText("reset-session-filters"));
+  expect(screen.getByLabelText("session-directory-status-filter")).toHaveTextContent("全部目录");
+  expect(screen.queryByText(/目录状态：/)).not.toBeInTheDocument();
+  expect(invokeMock.mock.calls.filter((call) => call[0] === "list_sessions").every((call) => {
+    const payload = call[1]?.payload ?? {};
+    return !("directoryStatusFilter" in payload);
+  })).toBe(true);
 });
 
 it("keeps bulk deletion out of the toolbar until a session is selected", async () => {

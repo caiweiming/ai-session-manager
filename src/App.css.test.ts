@@ -37,6 +37,21 @@ describe("App.css switch alignment", () => {
     expect(css).toMatch(/\.session-row\.subagent-row\.selected \.session-title-btn\s*{[^}]*color:\s*var\(--text-main\);/s);
   });
 
+  it("keeps directory status indicators stable, keyboard-visible, and motion-safe", () => {
+    expect(css).toMatch(/\.directory-status-indicator\s*{[^}]*width:\s*16px;[^}]*height:\s*16px;[^}]*flex:\s*0 0 16px;[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;/s);
+    expect(css).toMatch(/\.directory-status-indicator svg\s*{[^}]*width:\s*16px;[^}]*height:\s*16px;/s);
+    expect(css).toMatch(/\.directory-status-indicator:focus-visible\s*{[^}]*outline:\s*2px solid var\(--accent\);[^}]*outline-offset:\s*2px;/s);
+    expect(css).toMatch(/\.directory-status-tooltip\s*{[^}]*box-shadow:\s*0 8px 18px rgba\(0,\s*0,\s*0,\s*0\.24\);[^}]*font-family:\s*var\(--font-ui\);[^}]*visibility:\s*hidden;[^}]*opacity:\s*0;/s);
+    expect(css).toMatch(/\.directory-status-tooltip-above\s*{[^}]*bottom:\s*calc\(100% \+ 7px\);/s);
+    expect(css).toMatch(/\.directory-status-tooltip-below\s*{[^}]*top:\s*calc\(100% \+ 7px\);/s);
+    expect(css).toMatch(/\.directory-status-indicator:hover \.directory-status-tooltip,[\s\S]*\.directory-status-indicator:focus-visible \.directory-status-tooltip\s*{[^}]*visibility:\s*visible;[^}]*opacity:\s*1;/s);
+    expect(css).toMatch(/\.directory-status-missing,[\s\S]*\.directory-status-unavailable\s*{[^}]*color:\s*var\(--danger\);/s);
+    expect(css).toMatch(/\.directory-status-unknown,[\s\S]*\.directory-status-unchecked\s*{[^}]*color:\s*var\(--text-muted\);/s);
+    expect(css).toMatch(/\.directory-status-checking\s*{[^}]*color:\s*var\(--text-secondary\);/s);
+    expect(css).toMatch(/\.directory-status-checking svg\s*{[^}]*animation:\s*directory-status-spin 0\.8s linear infinite;/s);
+    expect(css).toMatch(/@media \(prefers-reduced-motion:\s*reduce\)\s*{[^}]*\.directory-status-checking svg\s*{[^}]*animation:\s*none;/s);
+  });
+
   it("renders scan failure states inline in the main area and sidebar", () => {
     expect(css).toMatch(/\.main-area-error-banner\s*{[^}]*border:\s*1px solid rgba\(239,\s*68,\s*68,\s*0\.18\);[^}]*display:\s*flex;/s);
     expect(css).toMatch(/\.main-area-error-title\s*{[^}]*font-weight:\s*700;[^}]*color:\s*#f87171;/s);

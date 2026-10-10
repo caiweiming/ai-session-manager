@@ -44,6 +44,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::sessions::check_workspace_paths,
             commands::sessions::refresh_sessions,
             commands::sessions::list_sessions,
             commands::sessions::list_trash_sessions,

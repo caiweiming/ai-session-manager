@@ -1,12 +1,12 @@
 use ai_session_manager::application::session_admin_service::purge_deleted_session_ids;
 use ai_session_manager::commands::sessions::{
-    clear_trash_at, delete_session_at, delete_sessions_at, export_session_markdown_at,
-    get_runtime_workspace, get_session_detail_at, list_sessions_at, list_subagent_sessions_at,
-    open_in_explorer_at, open_resume_in_terminal_at, refresh_sessions_at, update_app_settings_at,
-    DeleteSessionPayload, DeleteSessionsPayload, DeleteSessionTargetPayload,
-    ExportSessionMarkdownPayload, GetSessionDetailPayload, ListSessionsPayload,
-    ListSubagentSessionsPayload, OpenResumeInTerminalPayload, ScanSourcesPayload,
-    UpdateAppSettingsPayload,
+    check_workspace_paths_at, clear_trash_at, delete_session_at, delete_sessions_at,
+    export_session_markdown_at, get_runtime_workspace, get_session_detail_at, list_sessions_at,
+    list_subagent_sessions_at, open_in_explorer_at, open_resume_in_terminal_at,
+    refresh_sessions_at, update_app_settings_at, CheckWorkspacePathsPayload, DeleteSessionPayload,
+    DeleteSessionTargetPayload, DeleteSessionsPayload, ExportSessionMarkdownPayload,
+    GetSessionDetailPayload, ListSessionsPayload, ListSubagentSessionsPayload,
+    OpenResumeInTerminalPayload, ScanSourcesPayload, UpdateAppSettingsPayload,
 };
 use ai_session_manager::db::migrate::init_db;
 use rusqlite::Connection;
@@ -14,6 +14,45 @@ use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
 use tempfile::tempdir;
+
+#[tokio::test(flavor = "current_thread")]
+async fn check_workspace_paths_command_returns_stable_status_codes() {
+    let temp = tempdir().unwrap();
+    let missing = temp.path().join("missing-workspace");
+    let payload: CheckWorkspacePathsPayload = serde_json::from_value(json!({
+        "paths": [missing.to_string_lossy()]
+    }))
+    .unwrap();
+
+    let response = check_workspace_paths_at(payload).await.unwrap();
+    let json = serde_json::to_value(response).unwrap();
+
+    assert_eq!(json["results"][0]["path"], json!(missing.to_string_lossy()));
+    assert_eq!(json["results"][0]["status"], "missing");
+    assert!(json["results"][0]["reason"].is_null());
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn check_workspace_paths_command_returns_a_result_for_every_requested_alias() {
+    let temp = tempdir().unwrap();
+    let workspace = temp.path().join("workspace");
+    fs::create_dir(&workspace).unwrap();
+    let alias = workspace.join(".");
+    let requested = vec![
+        workspace.to_string_lossy().into_owned(),
+        alias.to_string_lossy().into_owned(),
+    ];
+
+    let response = check_workspace_paths_at(CheckWorkspacePathsPayload {
+        paths: requested.clone(),
+    })
+    .await
+    .unwrap();
+
+    assert_eq!(response.results.len(), 2);
+    assert_eq!(response.results[0].path, requested[0]);
+    assert_eq!(response.results[1].path, requested[1]);
+}
 
 #[test]
 fn sessions_commands_should_refresh_list_and_get_detail_with_real_data() {

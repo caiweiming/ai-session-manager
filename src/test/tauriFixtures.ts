@@ -1,5 +1,6 @@
 import type {
   AppSettings,
+  CheckWorkspacePathsResponse,
   PlatformCapabilities,
   OverviewSummary,
   RefreshSummary,
@@ -70,6 +71,12 @@ export const defaultSessionRow: SessionRow = {
 };
 
 export const defaultSessionRows: SessionRow[] = [defaultSessionRow];
+
+export const createAvailableWorkspacePathStatusResponse = (
+  paths: string[],
+): CheckWorkspacePathsResponse => ({
+  results: paths.map((path) => ({ path, status: "available" })),
+});
 
 export const defaultSessionDetail: SessionDetail = {
   sourceTool: "codex",
